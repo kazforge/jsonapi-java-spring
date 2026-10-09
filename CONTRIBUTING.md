@@ -45,9 +45,11 @@ path runs `sonar` after the build, waits for the Quality Gate, then runs the reu
 `check-new-code-issues.sh --list` check. It fails closed on API/JSON errors or any
 unresolved issue in the new-code period, not on historical/global issue totals.
 
-Unlike the core workflow, scans run only on pushes to `main`: all PR builds remain
-credential-free, including same-repository PRs. Sonar feedback is therefore post-merge,
-not a pre-merge PR gate. No privileged PR follow-up workflow is introduced. Normal
+Scans run on same-repository PRs as a pre-merge gate, with the issue check scoped to
+the PR number, and on pushes to `main` using the default-branch new-code period.
+Fork PRs explicitly skip all Sonar steps and receive no Sonar credentials. Tokens are
+scoped to the trusted Sonar steps, not the normal build. No privileged PR follow-up
+workflow is introduced. Normal
 `./gradlew clean build` never runs Sonar or needs a token; formatting, compiler/nullness,
 tests, and JaCoCo's 80/80 verification remain authoritative. Jackson-specific CPD/source
 exclusions, CycloneDX, publication/signing, and unrelated security tooling are not copied.
