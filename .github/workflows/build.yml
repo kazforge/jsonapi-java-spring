@@ -27,17 +27,13 @@ jobs:
         run: ./gradlew clean spotlessCheck build
       # Only main and same-repository PRs are trusted; fork PRs skip all Sonar steps.
       - name: Sonar Scan (trusted Java 21 path)
-        if: >-
-          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: ./gradlew sonar
       # The free-tier Quality Gate can pass with new smells; fail closed on the Issues API.
       - name: Verify zero new-code Sonar issues
-        if: >-
-          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           PULL_REQUEST: ${{ github.event.pull_request.number }}
