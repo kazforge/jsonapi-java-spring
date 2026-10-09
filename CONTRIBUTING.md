@@ -32,5 +32,27 @@ Normal dependencies resolve only from Maven Central. Do not introduce `mavenLoca
 local jsonapi-java composites, or source substitution. The Plugin Portal is used only
 to resolve build tooling. Publication/signing and Spring behavior are separate work.
 
+## SonarCloud
+
+The root config targets SonarCloud organization `kazemek`, project
+`kazforge_jsonapi-java-spring`, bound to this GitHub repository. Use CI-based analysis
+in SonarCloud (disable automatic analysis) and keep the repository's `SONAR_TOKEN`
+secret authorized to analyze this project.
+
+Like `jsonapi-java`, the Sonar plugin/version lives in the version catalog, configuration
+lives at the root, coverage comes from existing JaCoCo XML reports, and the Java 21 CI
+path runs `sonar` after the build, waits for the Quality Gate, then runs the reused
+`check-new-code-issues.sh --list` check. It fails closed on API/JSON errors or any
+unresolved issue in the new-code period, not on historical/global issue totals.
+
+Unlike the core workflow, scans run only on pushes to `main`: all PR builds remain
+credential-free, including same-repository PRs. Sonar feedback is therefore post-merge,
+not a pre-merge PR gate. No privileged PR follow-up workflow is introduced. Normal
+`./gradlew clean build` never runs Sonar or needs a token; formatting, compiler/nullness,
+tests, and JaCoCo's 80/80 verification remain authoritative. Jackson-specific CPD/source
+exclusions, CycloneDX, publication/signing, and unrelated security tooling are not copied.
+There are no runtime modules yet, so there are no production coverage reports to import
+until modules using the library convention are added.
+
 Files use UTF-8 and LF, except Windows `.bat`/`.cmd` scripts use CRLF. Keep the wrapper
 JAR committed and update its distribution checksum whenever updating Gradle.
