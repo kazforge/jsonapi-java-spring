@@ -1,10 +1,14 @@
+import com.diffplug.spotless.LineEnding
+
 plugins {
     id("com.diffplug.spotless")
 }
 
 spotless {
+    lineEndings = LineEnding.UNIX
     java {
-        target("**/*.java")
+        // Each module owns its Java sources; overlapping root/module targets corrupt cached paths.
+        target("src/**/*.java")
         targetExclude("**/build/**", "**/bin/**", "**/.gradle/**")
         googleJavaFormat()
         removeUnusedImports()

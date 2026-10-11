@@ -30,7 +30,13 @@ this also exempts it from the missing-data guard. There are no exemptions initia
 
 Normal dependencies resolve only from Maven Central. Do not introduce `mavenLocal()`,
 local jsonapi-java composites, or source substitution. The Plugin Portal is used only
-to resolve build tooling. Publication/signing and Spring behavior are separate work.
+to resolve build tooling. Publication/signing and consumer verification are separate work.
+
+WebMVC production compilation and default tests use Spring 7.0.0. Run
+`./gradlew clean build -PspringTestVersion=current` to select the catalog's current stable
+7.0 patch for tests only. The default is `minimum`; other values are rejected. Both paths
+run in the CI matrix; only minimum runs Sonar. Production dependencies remain at the floor.
+Minimum version changes require a maintainer decision; current-test patches may be automated.
 
 ## Repository documentation
 
@@ -60,8 +66,7 @@ workflow is introduced. Normal
 `./gradlew clean build` never runs Sonar or needs a token; formatting, compiler/nullness,
 tests, and JaCoCo's 80/80 verification remain authoritative. Jackson-specific CPD/source
 exclusions, CycloneDX, publication/signing, and unrelated security tooling are not copied.
-There are no runtime modules yet, so there are no production coverage reports to import
-until modules using the library convention are added.
+Modules with executable production code supply coverage reports through the library convention.
 
 Files use UTF-8 and LF, except Windows `.bat`/`.cmd` scripts use CRLF. Keep the wrapper
 JAR committed and update its distribution checksum whenever updating Gradle.
