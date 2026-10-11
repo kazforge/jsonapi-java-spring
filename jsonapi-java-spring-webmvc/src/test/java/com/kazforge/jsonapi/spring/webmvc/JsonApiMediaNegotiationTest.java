@@ -28,7 +28,9 @@ class JsonApiMediaNegotiationTest {
   void setUp() {
     mockMvc =
         MockMvcBuilders.standaloneSetup(
-                new JsonApiController(), new MixedController(), new PlainController(),
+                new JsonApiController(),
+                new MixedController(),
+                new PlainController(),
                 new VaryController())
             .addInterceptors(new JsonApiMediaNegotiationInterceptor())
             .setControllerAdvice(new JsonApiMediaNegotiationAdvice())
@@ -119,16 +121,14 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(
             get("/api/articles")
-                .header(
-                    HttpHeaders.ACCEPT, JSON_API + ";ext=\"" + EXT + "\", " + JSON_API))
+                .header(HttpHeaders.ACCEPT, JSON_API + ";ext=\"" + EXT + "\", " + JSON_API))
         .andExpect(status().isOk());
   }
 
   @Test
   void getWithOnlyUnsupportedExtensionIsNotAcceptable() throws Exception {
     mockMvc
-        .perform(
-            get("/api/articles").header(HttpHeaders.ACCEPT, JSON_API + ";ext=\"" + EXT + "\""))
+        .perform(get("/api/articles").header(HttpHeaders.ACCEPT, JSON_API + ";ext=\"" + EXT + "\""))
         .andExpect(status().isNotAcceptable());
   }
 
@@ -194,9 +194,7 @@ class JsonApiMediaNegotiationTest {
   void postWithJsonContentTypeIsUnsupported() throws Exception {
     mockMvc
         .perform(
-            post("/api/articles")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"data\":[]}"))
+            post("/api/articles").contentType(MediaType.APPLICATION_JSON).content("{\"data\":[]}"))
         .andExpect(status().isUnsupportedMediaType());
   }
 
@@ -314,9 +312,7 @@ class JsonApiMediaNegotiationTest {
   static class VaryController {
     @GetMapping("/api/vary")
     public ResponseEntity<String> vary() {
-      return ResponseEntity.ok()
-          .header(HttpHeaders.VARY, "Accept-Encoding")
-          .body("{\"data\":[]}");
+      return ResponseEntity.ok().header(HttpHeaders.VARY, "Accept-Encoding").body("{\"data\":[]}");
     }
   }
 }

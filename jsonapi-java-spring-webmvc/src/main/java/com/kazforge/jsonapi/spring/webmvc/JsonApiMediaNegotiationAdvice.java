@@ -65,7 +65,9 @@ public class JsonApiMediaNegotiationAdvice implements ResponseBodyAdvice<Object>
   private static @Nullable String negotiatedContentType(ServerHttpRequest request) {
     if (request instanceof ServletServerHttpRequest servletRequest) {
       Object value =
-          servletRequest.getServletRequest().getAttribute(JsonApiMediaNegotiation.NEGOTIATED_ATTRIBUTE);
+          servletRequest
+              .getServletRequest()
+              .getAttribute(JsonApiMediaNegotiation.NEGOTIATED_ATTRIBUTE);
       if (value instanceof String negotiated) {
         return negotiated;
       }

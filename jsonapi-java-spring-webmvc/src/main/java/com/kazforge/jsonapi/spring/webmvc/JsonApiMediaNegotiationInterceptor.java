@@ -12,25 +12,25 @@ import org.springframework.web.servlet.HandlerInterceptor;
 /**
  * Enforces JSON:API 1.1 media negotiation for {@link JsonApiEndpoint}-annotated handlers.
  *
- * <p>Validates {@code Content-Type} on requests with a body (415 on mismatch) and negotiates
- * {@code Accept} (406 when nothing acceptable remains). Handlers without {@link JsonApiEndpoint}
- * are ignored. On success the negotiated content type is stored as a request attribute for {@link
+ * <p>Validates {@code Content-Type} on requests with a body (415 on mismatch) and negotiates {@code
+ * Accept} (406 when nothing acceptable remains). Handlers without {@link JsonApiEndpoint} are
+ * ignored. On success the negotiated content type is stored as a request attribute for {@link
  * JsonApiMediaNegotiationAdvice}, which sets response headers before the body is written.
  *
  * <p>Register via {@code WebMvcConfigurer#addInterceptors} alongside the advice bean. Annotated
- * mappings must not declare {@code consumes}/{@code produces}: those checks run in handler
- * mapping before this interceptor and would bypass JSON:API handling.
+ * mappings must not declare {@code consumes}/{@code produces}: those checks run in handler mapping
+ * before this interceptor and would bypass JSON:API handling.
  */
 public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
 
   @Override
-  public boolean preHandle(
-      HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+  public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+      throws Exception {
     if (!isJsonApiHandler(handler)) {
       return true;
     }
-    if (hasBody(request) && JsonApiMediaNegotiation.validateContentType(request.getContentType())
-        != null) {
+    if (hasBody(request)
+        && JsonApiMediaNegotiation.validateContentType(request.getContentType()) != null) {
       response.setStatus(HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE);
       return false;
     }

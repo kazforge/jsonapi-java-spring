@@ -9,9 +9,9 @@ import org.springframework.http.MediaType;
 /**
  * JSON:API 1.1 media-type negotiation rules shared by the interceptor and response advice.
  *
- * <p>Package-private. Not a generic negotiation framework and not an extension registry: this
- * slice supports no extensions, so any requested {@code ext} URI is unsupported, while unknown
- * {@code profile} URIs are ignored.
+ * <p>Package-private. Not a generic negotiation framework and not an extension registry: this slice
+ * supports no extensions, so any requested {@code ext} URI is unsupported, while unknown {@code
+ * profile} URIs are ignored.
  */
 final class JsonApiMediaNegotiation {
 
@@ -31,8 +31,8 @@ final class JsonApiMediaNegotiation {
   }
 
   /**
-   * Validates a {@code Content-Type} value for a request carrying a body. Returns {@code null}
-   * when valid, {@code "unsupported"} when the request must fail with 415.
+   * Validates a {@code Content-Type} value for a request carrying a body. Returns {@code null} when
+   * valid, {@code "unsupported"} when the request must fail with 415.
    */
   static @Nullable String validateContentType(@Nullable String contentTypeValue) {
     if (contentTypeValue == null || contentTypeValue.isBlank()) {
@@ -62,8 +62,8 @@ final class JsonApiMediaNegotiation {
    * Negotiates the response {@code Content-Type} from {@code Accept} header values. Returns {@code
    * null} when no acceptable representation remains and the server must respond 406.
    *
-   * <p>Invalid or unsupported alternatives are skipped. Quality values apply, including {@code
-   * q=0} meaning "not acceptable". Unknown profiles are ignored.
+   * <p>Invalid or unsupported alternatives are skipped. Quality values apply, including {@code q=0}
+   * meaning "not acceptable". Unknown profiles are ignored.
    */
   static @Nullable String negotiateContentType(@Nullable Enumeration<String> acceptHeaders) {
     if (acceptHeaders == null || !acceptHeaders.hasMoreElements()) {
@@ -155,9 +155,7 @@ final class JsonApiMediaNegotiation {
     }
     // No extensions are supported in this slice, so any listed URI is unsupported.
     String unquoted = extValue.trim();
-    if (unquoted.length() >= 2
-        && unquoted.startsWith("\"")
-        && unquoted.endsWith("\"")) {
+    if (unquoted.length() >= 2 && unquoted.startsWith("\"") && unquoted.endsWith("\"")) {
       unquoted = unquoted.substring(1, unquoted.length() - 1);
     }
     return !unquoted.isBlank();
