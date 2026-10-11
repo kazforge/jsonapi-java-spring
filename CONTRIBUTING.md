@@ -32,6 +32,13 @@ Normal dependencies resolve only from Maven Central. Do not introduce `mavenLoca
 local jsonapi-java composites, or source substitution. The Plugin Portal is used only
 to resolve build tooling. Publication/signing and Spring behavior are separate work.
 
+## Repository documentation
+
+Update [architecture](docs/architecture.md) in the same PR when changing repository
+boundaries, module ownership, compatibility, or other durable contracts. Add or
+supersede an [ADR](docs/adr/README.md) for consequential architectural decisions;
+routine fixes do not need one.
+
 ## SonarCloud
 
 The root config targets SonarCloud organization `kazemek`, project

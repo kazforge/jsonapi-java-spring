@@ -21,4 +21,6 @@ Install JDK 21 and use the committed wrapper:
 `build` includes formatting checks and validation of the reusable build conventions.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the module quality policy.
 
+See [repository architecture and decisions](docs/README.md).
+
 Licensed under [Apache-2.0](LICENSE).
