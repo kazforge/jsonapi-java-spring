@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "jsonapi-java-spring"
+include("jsonapi-java-spring-webmvc")
