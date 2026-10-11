@@ -25,6 +25,7 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit" }
 jsonapi-api = { module = "com.kazforge:jsonapi-java-api", version.ref = "jsonapi" }
 spring-webmvc = { module = "org.springframework:spring-webmvc", version.ref = "spring-minimum" }
+spring-test = { module = "org.springframework:spring-test", version.ref = "spring-minimum" }
 spring-current-bom = { module = "org.springframework:spring-framework-bom", version.ref = "spring-current" }
 
 [plugins]
