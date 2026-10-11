@@ -12,6 +12,7 @@ dependencies {
     api(libs.spring.webmvc)
     api(libs.servlet.api)
     testImplementation(libs.spring.test)
+    testImplementation(libs.hamcrest)
     if (springTestVersion == "current") {
         testImplementation(platform(libs.spring.current.bom))
     }
