@@ -20,6 +20,8 @@ final class JsonApiMediaNegotiation {
 
   static final MediaType JSON_API = MediaType.parseMediaType(JSON_API_VALUE);
 
+  private static final String APPLICATION_TYPE = JSON_API.getType();
+
   private static final String UNSUPPORTED = "unsupported";
 
   private JsonApiMediaNegotiation() {}
@@ -38,7 +40,7 @@ final class JsonApiMediaNegotiation {
     } catch (IllegalArgumentException ex) {
       return UNSUPPORTED;
     }
-    if (!"application".equalsIgnoreCase(contentType.getType())
+    if (!APPLICATION_TYPE.equalsIgnoreCase(contentType.getType())
         || !JSON_API.getSubtype().equalsIgnoreCase(contentType.getSubtype())) {
       return UNSUPPORTED;
     }
@@ -133,49 +135,39 @@ final class JsonApiMediaNegotiation {
    * ranges, which never carry JSON:API parameters.
    */
   private static boolean isAcceptable(List<MediaType> ranges) {
-    List<MediaType> viable = new ArrayList<>();
-    for (MediaType range : ranges) {
-      if (matchesJsonApi(range)) {
-        viable.add(range);
-      }
-    }
-    if (viable.isEmpty()) {
-      return false;
-    }
-    MediaType mostSpecific = viable.get(0);
-    for (MediaType range : viable) {
-      if (isMoreSpecific(range, mostSpecific)) {
-        mostSpecific = range;
-      }
-    }
-    return mostSpecific.getQualityValue() > 0.0;
-  }
-
-  /** Whether the range can select the JSON:API media type, ignoring its quality value. */
-  private static boolean matchesJsonApi(MediaType range) {
-    if ("application".equalsIgnoreCase(range.getType())
-        && !range.isWildcardSubtype()
-        && JSON_API.getSubtype().equalsIgnoreCase(range.getSubtype())) {
-      return !hasDisallowedParameter(range) && !hasUnsupportedExtension(range.getParameter("ext"));
-    }
-    return range.isWildcardType()
-        || ("application".equalsIgnoreCase(range.getType()) && range.isWildcardSubtype());
+    MediaType mostSpecific =
+        ranges.stream()
+            .filter(JsonApiMediaNegotiation::matchesJsonApi)
+            .max(JsonApiMediaNegotiation::comparePrecedence)
+            .orElse(null);
+    return mostSpecific != null && mostSpecific.getQualityValue() > 0.0;
   }
 
   /**
    * RFC 9110 precedence: a fully specified type beats any wildcard range; among ranges of equal
    * type/subtype specificity, more specified parameters and then a higher quality value win.
    */
-  private static boolean isMoreSpecific(MediaType candidate, MediaType current) {
-    int candidateSpecificity = specificity(candidate);
-    int currentSpecificity = specificity(current);
-    if (candidateSpecificity != currentSpecificity) {
-      return candidateSpecificity > currentSpecificity;
+  private static int comparePrecedence(MediaType left, MediaType right) {
+    int specificity = Integer.compare(specificity(left), specificity(right));
+    if (specificity != 0) {
+      return specificity;
     }
-    if (candidate.getParameters().size() != current.getParameters().size()) {
-      return candidate.getParameters().size() > current.getParameters().size();
+    int parameters = Integer.compare(left.getParameters().size(), right.getParameters().size());
+    if (parameters != 0) {
+      return parameters;
     }
-    return candidate.getQualityValue() > current.getQualityValue();
+    return Double.compare(left.getQualityValue(), right.getQualityValue());
+  }
+
+  /** Whether the range can select the JSON:API media type, ignoring its quality value. */
+  private static boolean matchesJsonApi(MediaType range) {
+    if (APPLICATION_TYPE.equalsIgnoreCase(range.getType())
+        && !range.isWildcardSubtype()
+        && JSON_API.getSubtype().equalsIgnoreCase(range.getSubtype())) {
+      return !hasDisallowedParameter(range) && !hasUnsupportedExtension(range.getParameter("ext"));
+    }
+    return range.isWildcardType()
+        || (APPLICATION_TYPE.equalsIgnoreCase(range.getType()) && range.isWildcardSubtype());
   }
 
   private static int specificity(MediaType range) {
