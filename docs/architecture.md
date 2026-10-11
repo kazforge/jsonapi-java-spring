@@ -26,7 +26,8 @@ Dependencies resolve from Maven Central; the Plugin Portal also supplies build t
 Spring integration's core dependency boundary is released public neutral APIs, not
 core source or internal packages.
 
-The WebMVC module exposes `jsonapi-java-api:0.2.0` and Spring WebMVC as API dependencies.
+The WebMVC module exposes `jsonapi-java-api:0.2.0`, Spring WebMVC, and the Servlet 6.1 API
+as API dependencies.
 Production and test dependencies contain no Jackson runtime; architecture boundary tests
 arrive with the WebMVC implementation. Publication configuration and real consumer
 integration tests are separate work.

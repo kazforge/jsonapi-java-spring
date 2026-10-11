@@ -10,6 +10,7 @@ require(springTestVersion in setOf("minimum", "current")) {
 dependencies {
     api(libs.jsonapi.api)
     api(libs.spring.webmvc)
+    api(libs.servlet.api)
     testImplementation(libs.spring.test)
     if (springTestVersion == "current") {
         testImplementation(platform(libs.spring.current.bom))
