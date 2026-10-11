@@ -34,22 +34,10 @@ to resolve build tooling. Publication/signing and Spring behavior are separate w
 
 ## Repository documentation
 
-The [repository documentation index](docs/README.md) points to canonical
-[current-state architecture](docs/architecture.md) and
-[architecture decision records](docs/adr/README.md).
-
-When a PR changes durable architecture, supported compatibility, module ownership,
-release/product boundaries, or another repository-level contract, update the relevant
-current-state documentation in the **same PR**. Create or supersede an ADR when the
-decision warrants a durable rationale; routine fixes do not each need an ADR. Do not
-defer known documentation drift to a cleanup ticket or leave Linear/PR discussions
-as the only record. Follow the ADR convention and keep its index current.
-
-Describe implemented state separately from accepted constraints or planned work.
-Keep compatibility/version details in one canonical location and link rather than
-duplicate them. User-facing Spring installation, setup, and tutorials belong to
-[KAZ-210](https://linear.app/kazforge/issue/KAZ-210), not this maintainer baseline;
-framework-neutral concepts remain in the [core guide](https://jsonapi.kazforge.com/).
+Update [architecture](docs/architecture.md) in the same PR when changing repository
+boundaries, module ownership, compatibility, or other durable contracts. Add or
+supersede an [ADR](docs/adr/README.md) for consequential architectural decisions;
+routine fixes do not need one.
 
 ## SonarCloud
 

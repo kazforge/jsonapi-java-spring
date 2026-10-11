@@ -21,10 +21,6 @@ Install JDK 21 and use the committed wrapper:
 `build` includes formatting checks and validation of the reusable build conventions.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the module quality policy.
 
-## Repository documentation
-
-See the [repository documentation index](docs/README.md) for current architecture,
-module ownership, and architecture decision records. These are maintainer docs,
-not Spring installation or setup tutorials.
+See [repository architecture and decisions](docs/README.md).
 
 Licensed under [Apache-2.0](LICENSE).
