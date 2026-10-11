@@ -27,12 +27,7 @@ public class JsonApiMediaNegotiationAdvice implements ResponseBodyAdvice<Object>
   @Override
   public boolean supports(
       MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
-    Method method = returnType.getMethod();
-    if (method != null && method.isAnnotationPresent(JsonApiEndpoint.class)) {
-      return true;
-    }
-    Class<?> containing = returnType.getContainingClass();
-    return containing != null && containing.isAnnotationPresent(JsonApiEndpoint.class);
+    return isJsonApiHandler(returnType);
   }
 
   @Override
@@ -55,11 +50,11 @@ public class JsonApiMediaNegotiationAdvice implements ResponseBodyAdvice<Object>
 
   private static boolean isJsonApiHandler(MethodParameter returnType) {
     Method method = returnType.getMethod();
-    if (method != null && method.isAnnotationPresent(JsonApiEndpoint.class)) {
-      return true;
+    if (method == null) {
+      return false;
     }
-    Class<?> containing = returnType.getContainingClass();
-    return containing != null && containing.isAnnotationPresent(JsonApiEndpoint.class);
+    return method.isAnnotationPresent(JsonApiEndpoint.class)
+        || method.getDeclaringClass().isAnnotationPresent(JsonApiEndpoint.class);
   }
 
   private static @Nullable String negotiatedContentType(ServerHttpRequest request) {

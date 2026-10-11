@@ -57,11 +57,7 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
     if (request.getContentType() == null) {
       return false;
     }
-    long length = request.getContentLengthLong();
-    if (length == 0) {
-      return false;
-    }
-    return true;
+    return request.getContentLengthLong() != 0;
   }
 
   static void mergeVary(HttpServletResponse response) {

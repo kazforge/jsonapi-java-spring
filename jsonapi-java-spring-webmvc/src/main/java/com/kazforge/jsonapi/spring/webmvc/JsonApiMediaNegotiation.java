@@ -22,6 +22,8 @@ final class JsonApiMediaNegotiation {
   static final String NEGOTIATED_ATTRIBUTE =
       JsonApiMediaNegotiation.class.getName() + ".negotiatedContentType";
 
+  private static final String UNSUPPORTED = "unsupported";
+
   private JsonApiMediaNegotiation() {}
 
   static boolean isJsonApi(MediaType candidate) {
@@ -41,18 +43,18 @@ final class JsonApiMediaNegotiation {
     try {
       contentType = MediaType.parseMediaType(contentTypeValue);
     } catch (IllegalArgumentException ex) {
-      return "unsupported";
+      return UNSUPPORTED;
     }
     if (!isJsonApi(contentType)) {
-      return "unsupported";
+      return UNSUPPORTED;
     }
     for (String name : contentType.getParameters().keySet()) {
       if (!"ext".equalsIgnoreCase(name) && !"profile".equalsIgnoreCase(name)) {
-        return "unsupported";
+        return UNSUPPORTED;
       }
     }
     if (hasUnsupportedExtension(contentType.getParameter("ext"))) {
-      return "unsupported";
+      return UNSUPPORTED;
     }
     return null;
   }
@@ -65,20 +67,33 @@ final class JsonApiMediaNegotiation {
    * meaning "not acceptable". Unknown profiles are ignored.
    */
   static @Nullable String negotiateContentType(@Nullable Enumeration<String> acceptHeaders) {
-    if (acceptHeaders == null || !acceptHeaders.hasMoreElements()) {
+    List<String> rawValues = acceptHeaderValues(acceptHeaders);
+    if (rawValues.stream().allMatch(String::isBlank)) {
       return JSON_API_VALUE;
     }
-    List<String> rawValues = new ArrayList<>();
-    while (acceptHeaders.hasMoreElements()) {
-      rawValues.add(acceptHeaders.nextElement());
+    List<MediaType> candidates = parseAcceptCandidates(rawValues);
+    if (candidates.isEmpty()) {
+      return null;
     }
-    boolean sawAnyValue = false;
+    return selectNegotiatedType(candidates);
+  }
+
+  private static List<String> acceptHeaderValues(@Nullable Enumeration<String> acceptHeaders) {
+    List<String> rawValues = new ArrayList<>();
+    if (acceptHeaders != null) {
+      while (acceptHeaders.hasMoreElements()) {
+        rawValues.add(acceptHeaders.nextElement());
+      }
+    }
+    return rawValues;
+  }
+
+  private static List<MediaType> parseAcceptCandidates(List<String> rawValues) {
     List<MediaType> candidates = new ArrayList<>();
     for (String rawValue : rawValues) {
       if (rawValue.isBlank()) {
         continue;
       }
-      sawAnyValue = true;
       for (String token : rawValue.split(",")) {
         String trimmed = token.trim();
         if (trimmed.isEmpty()) {
@@ -91,46 +106,44 @@ final class JsonApiMediaNegotiation {
         }
       }
     }
-    if (!sawAnyValue) {
-      return JSON_API_VALUE;
-    }
-    if (candidates.isEmpty()) {
-      return null;
-    }
+    return candidates;
+  }
+
+  private static @Nullable String selectNegotiatedType(List<MediaType> candidates) {
     // Most preferred first: quality wins, then specificity. Sort is stable, so equally
     // preferred alternatives keep their header order.
-    candidates.sort(
-        (left, right) -> {
-          int quality = Double.compare(right.getQualityValue(), left.getQualityValue());
-          if (quality != 0) {
-            return quality;
-          }
-          if (left.isMoreSpecific(right)) {
-            return -1;
-          }
-          if (left.isLessSpecific(right)) {
-            return 1;
-          }
-          return 0;
-        });
+    candidates.sort(JsonApiMediaNegotiation::comparePreference);
     for (MediaType candidate : candidates) {
-      if (candidate.getQualityValue() == 0.0) {
-        continue;
-      }
-      if (isJsonApi(candidate)) {
-        if (hasDisallowedParameter(candidate)) {
-          continue;
-        }
-        if (hasUnsupportedExtension(candidate.getParameter("ext"))) {
-          continue;
-        }
-        return JSON_API_VALUE;
-      }
-      if (isWildcard(candidate)) {
+      if (isSelectable(candidate)) {
         return JSON_API_VALUE;
       }
     }
     return null;
+  }
+
+  private static int comparePreference(MediaType left, MediaType right) {
+    int quality = Double.compare(right.getQualityValue(), left.getQualityValue());
+    if (quality != 0) {
+      return quality;
+    }
+    if (left.isMoreSpecific(right)) {
+      return -1;
+    }
+    if (left.isLessSpecific(right)) {
+      return 1;
+    }
+    return 0;
+  }
+
+  private static boolean isSelectable(MediaType candidate) {
+    if (candidate.getQualityValue() == 0.0) {
+      return false;
+    }
+    if (isJsonApi(candidate)) {
+      return !hasDisallowedParameter(candidate)
+          && !hasUnsupportedExtension(candidate.getParameter("ext"));
+    }
+    return isWildcard(candidate);
   }
 
   private static boolean hasDisallowedParameter(MediaType candidate) {

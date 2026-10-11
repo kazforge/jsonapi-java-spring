@@ -107,8 +107,8 @@ class JsonApiMediaNegotiationDirectTest {
   }
 
   @Test
-  void supportsConstructorParameterOnAnnotatedType() throws NoSuchMethodException {
-    assertTrue(
+  void rejectsConstructorParameterOnAnnotatedType() throws NoSuchMethodException {
+    assertFalse(
         supports(new MethodParameter(AnnotatedController.class.getDeclaredConstructor(), -1)));
   }
 
