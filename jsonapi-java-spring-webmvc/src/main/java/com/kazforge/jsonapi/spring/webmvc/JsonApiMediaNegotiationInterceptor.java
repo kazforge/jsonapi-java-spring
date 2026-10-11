@@ -5,21 +5,23 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.ModelAndView;
 
 /**
  * Enforces JSON:API 1.1 media negotiation for {@link JsonApiEndpoint}-annotated handlers.
  *
- * <p>Validates {@code Content-Type} on requests with a body (415 on mismatch) and negotiates {@code
- * Accept} (406 when nothing acceptable remains). Handlers without {@link JsonApiEndpoint} are
- * ignored. On success the negotiated content type is stored as a request attribute for {@link
- * JsonApiMediaNegotiationAdvice}, which sets response headers before the body is written.
+ * <p>Validates {@code Content-Type} on requests with a body (415 on mismatch), negotiates {@code
+ * Accept} (406 when nothing acceptable remains), and sets the negotiated response {@code
+ * Content-Type} together with {@code Vary: Accept} before the body is written. Handlers without
+ * {@link JsonApiEndpoint} are ignored, so ordinary Spring MVC endpoints are unaffected.
  *
- * <p>Register via {@code WebMvcConfigurer#addInterceptors} alongside the advice bean. Annotated
- * mappings must not declare {@code consumes}/{@code produces}: those checks run in handler mapping
- * before this interceptor and would bypass JSON:API handling.
+ * <p>Register via {@code WebMvcConfigurer#addInterceptors}. Annotated mappings must not declare
+ * {@code consumes}/{@code produces}: those checks run in handler mapping before this interceptor
+ * and would bypass JSON:API handling.
  */
 public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
 
@@ -30,7 +32,8 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
       return true;
     }
     if (hasBody(request)
-        && JsonApiMediaNegotiation.validateContentType(request.getContentType()) != null) {
+        && (request.getContentType() == null
+            || JsonApiMediaNegotiation.validateContentType(request.getContentType()) != null)) {
       response.setStatus(HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE);
       return false;
     }
@@ -41,8 +44,20 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
       response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
       return false;
     }
-    request.setAttribute(JsonApiMediaNegotiation.NEGOTIATED_ATTRIBUTE, negotiated);
     return true;
+  }
+
+  @Override
+  public void postHandle(
+      HttpServletRequest request,
+      HttpServletResponse response,
+      Object handler,
+      @Nullable ModelAndView modelAndView) {
+    if (!isJsonApiHandler(handler)) {
+      return;
+    }
+    mergeVary(response);
+    response.setContentType(JsonApiMediaNegotiation.JSON_API_VALUE);
   }
 
   private static boolean isJsonApiHandler(Object handler) {
@@ -53,23 +68,21 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
         || method.getBeanType().isAnnotationPresent(JsonApiEndpoint.class);
   }
 
+  /**
+   * Whether the request carries a body. Requests without a body carry no {@code Content-Length} (or
+   * a zero length), so there is no {@code Content-Type} to validate.
+   */
   private static boolean hasBody(HttpServletRequest request) {
-    if (request.getContentType() == null) {
-      return false;
-    }
-    return request.getContentLengthLong() != 0;
+    return request.getContentLengthLong() > 0;
   }
 
-  static void mergeVary(HttpServletResponse response) {
+  private static void mergeVary(HttpServletResponse response) {
     Collection<String> existing = response.getHeaders(HttpHeaders.VARY);
     List<String> tokens = new ArrayList<>();
     for (String value : existing) {
-      if (value == null) {
-        continue;
-      }
       for (String token : value.split(",")) {
         String trimmed = token.trim();
-        if (!trimmed.isEmpty()) {
+        if (!trimmed.isEmpty() && !tokens.contains(trimmed)) {
           tokens.add(trimmed);
         }
       }

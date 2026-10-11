@@ -7,11 +7,12 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 
 /**
- * JSON:API 1.1 media-type negotiation rules shared by the interceptor and response advice.
+ * JSON:API 1.1 media-type negotiation rules used by {@link JsonApiMediaNegotiationInterceptor}.
  *
- * <p>Package-private. Not a generic negotiation framework and not an extension registry: this slice
- * supports no extensions, so any requested {@code ext} URI is unsupported, while unknown {@code
- * profile} URIs are ignored.
+ * <p>Package-private and deliberately small: this slice supports no extensions, so any requested
+ * {@code ext} URI is unsupported, while unknown {@code profile} URIs are ignored. Accept ranking
+ * follows RFC 9110 precedence: the most specific viable media range decides whether the JSON:API
+ * media type is acceptable, including {@code q=0} exclusions.
  */
 final class JsonApiMediaNegotiation {
 
@@ -19,17 +20,9 @@ final class JsonApiMediaNegotiation {
 
   static final MediaType JSON_API = MediaType.parseMediaType(JSON_API_VALUE);
 
-  static final String NEGOTIATED_ATTRIBUTE =
-      JsonApiMediaNegotiation.class.getName() + ".negotiatedContentType";
-
   private static final String UNSUPPORTED = "unsupported";
 
   private JsonApiMediaNegotiation() {}
-
-  static boolean isJsonApi(MediaType candidate) {
-    return "application".equalsIgnoreCase(candidate.getType())
-        && "vnd.api+json".equalsIgnoreCase(candidate.getSubtype());
-  }
 
   /**
    * Validates a {@code Content-Type} value for a request carrying a body. Returns {@code null} when
@@ -45,7 +38,8 @@ final class JsonApiMediaNegotiation {
     } catch (IllegalArgumentException ex) {
       return UNSUPPORTED;
     }
-    if (!isJsonApi(contentType)) {
+    if (!"application".equalsIgnoreCase(contentType.getType())
+        || !JSON_API.getSubtype().equalsIgnoreCase(contentType.getSubtype())) {
       return UNSUPPORTED;
     }
     for (String name : contentType.getParameters().keySet()) {
@@ -63,19 +57,18 @@ final class JsonApiMediaNegotiation {
    * Negotiates the response {@code Content-Type} from {@code Accept} header values. Returns {@code
    * null} when no acceptable representation remains and the server must respond 406.
    *
-   * <p>Invalid or unsupported alternatives are skipped. Quality values apply, including {@code q=0}
-   * meaning "not acceptable". Unknown profiles are ignored.
+   * <p>Invalid alternatives are ignored; unknown profiles are ignored. A JSON:API alternative
+   * modified by a parameter other than {@code ext}, {@code profile} or {@code q} is not a JSON:API
+   * representation and lets less specific ranges decide. Quality values apply, so an explicit
+   * {@code q=0} JSON:API range makes the response unacceptable even when a wildcard range is also
+   * present.
    */
   static @Nullable String negotiateContentType(@Nullable Enumeration<String> acceptHeaders) {
     List<String> rawValues = acceptHeaderValues(acceptHeaders);
     if (rawValues.stream().allMatch(String::isBlank)) {
       return JSON_API_VALUE;
     }
-    List<MediaType> candidates = parseAcceptCandidates(rawValues);
-    if (candidates.isEmpty()) {
-      return null;
-    }
-    return selectNegotiatedType(candidates);
+    return isAcceptable(parseMediaRanges(rawValues)) ? JSON_API_VALUE : null;
   }
 
   private static List<String> acceptHeaderValues(@Nullable Enumeration<String> acceptHeaders) {
@@ -88,66 +81,115 @@ final class JsonApiMediaNegotiation {
     return rawValues;
   }
 
-  private static List<MediaType> parseAcceptCandidates(List<String> rawValues) {
-    List<MediaType> candidates = new ArrayList<>();
+  private static List<MediaType> parseMediaRanges(List<String> rawValues) {
+    List<MediaType> ranges = new ArrayList<>();
     for (String rawValue : rawValues) {
-      if (rawValue.isBlank()) {
-        continue;
-      }
-      for (String token : rawValue.split(",")) {
-        String trimmed = token.trim();
-        if (trimmed.isEmpty()) {
-          continue;
-        }
+      for (String token : splitOutsideQuotes(rawValue)) {
         try {
-          candidates.add(MediaType.parseMediaType(trimmed));
+          ranges.add(MediaType.parseMediaType(token));
         } catch (IllegalArgumentException ex) {
-          // Ignore invalid alternatives per the approved plan; keep scanning.
+          // Malformed alternatives are ignored, per JSON:API 1.1 and the approved plan.
         }
       }
     }
-    return candidates;
+    return ranges;
   }
 
-  private static @Nullable String selectNegotiatedType(List<MediaType> candidates) {
-    // Most preferred first: quality wins, then specificity. Sort is stable, so equally
-    // preferred alternatives keep their header order.
-    candidates.sort(JsonApiMediaNegotiation::comparePreference);
-    for (MediaType candidate : candidates) {
-      if (isSelectable(candidate)) {
-        return JSON_API_VALUE;
+  /**
+   * Splits an Accept header value on commas that separate media ranges, preserving commas inside
+   * quoted parameter values such as {@code ext="a,b"}.
+   */
+  private static List<String> splitOutsideQuotes(String headerValue) {
+    List<String> tokens = new ArrayList<>();
+    StringBuilder token = new StringBuilder();
+    boolean inQuotes = false;
+    for (int index = 0; index < headerValue.length(); index++) {
+      char current = headerValue.charAt(index);
+      if (current == '"') {
+        inQuotes = !inQuotes;
+      }
+      if (current == ',' && !inQuotes) {
+        addToken(tokens, token);
+        token.setLength(0);
+      } else {
+        token.append(current);
       }
     }
-    return null;
+    addToken(tokens, token);
+    return tokens;
   }
 
-  private static int comparePreference(MediaType left, MediaType right) {
-    int quality = Double.compare(right.getQualityValue(), left.getQualityValue());
-    if (quality != 0) {
-      return quality;
+  private static void addToken(List<String> tokens, StringBuilder token) {
+    String trimmed = token.toString().trim();
+    if (!trimmed.isEmpty()) {
+      tokens.add(trimmed);
     }
-    if (left.isMoreSpecific(right)) {
-      return -1;
-    }
-    if (left.isLessSpecific(right)) {
-      return 1;
-    }
-    return 0;
   }
 
-  private static boolean isSelectable(MediaType candidate) {
-    if (candidate.getQualityValue() == 0.0) {
+  /**
+   * Applies RFC 9110 precedence: the most specific viable media range matching the JSON:API media
+   * type determines whether it is acceptable. A JSON:API range carrying other parameters, or only
+   * unsupported extensions, is not a viable JSON:API representation, so it steps aside for wildcard
+   * ranges, which never carry JSON:API parameters.
+   */
+  private static boolean isAcceptable(List<MediaType> ranges) {
+    List<MediaType> viable = new ArrayList<>();
+    for (MediaType range : ranges) {
+      if (matchesJsonApi(range)) {
+        viable.add(range);
+      }
+    }
+    if (viable.isEmpty()) {
       return false;
     }
-    if (isJsonApi(candidate)) {
-      return !hasDisallowedParameter(candidate)
-          && !hasUnsupportedExtension(candidate.getParameter("ext"));
+    MediaType mostSpecific = viable.get(0);
+    for (MediaType range : viable) {
+      if (isMoreSpecific(range, mostSpecific)) {
+        mostSpecific = range;
+      }
     }
-    return isWildcard(candidate);
+    return mostSpecific.getQualityValue() > 0.0;
   }
 
-  private static boolean hasDisallowedParameter(MediaType candidate) {
-    for (String name : candidate.getParameters().keySet()) {
+  /** Whether the range can select the JSON:API media type, ignoring its quality value. */
+  private static boolean matchesJsonApi(MediaType range) {
+    if ("application".equalsIgnoreCase(range.getType())
+        && !range.isWildcardSubtype()
+        && JSON_API.getSubtype().equalsIgnoreCase(range.getSubtype())) {
+      return !hasDisallowedParameter(range) && !hasUnsupportedExtension(range.getParameter("ext"));
+    }
+    return range.isWildcardType()
+        || ("application".equalsIgnoreCase(range.getType()) && range.isWildcardSubtype());
+  }
+
+  /**
+   * RFC 9110 precedence: a fully specified type beats any wildcard range; among ranges of equal
+   * type/subtype specificity, more specified parameters and then a higher quality value win.
+   */
+  private static boolean isMoreSpecific(MediaType candidate, MediaType current) {
+    int candidateSpecificity = specificity(candidate);
+    int currentSpecificity = specificity(current);
+    if (candidateSpecificity != currentSpecificity) {
+      return candidateSpecificity > currentSpecificity;
+    }
+    if (candidate.getParameters().size() != current.getParameters().size()) {
+      return candidate.getParameters().size() > current.getParameters().size();
+    }
+    return candidate.getQualityValue() > current.getQualityValue();
+  }
+
+  private static int specificity(MediaType range) {
+    if (range.isWildcardType()) {
+      return 1;
+    }
+    if (range.isWildcardSubtype()) {
+      return 2;
+    }
+    return 3;
+  }
+
+  private static boolean hasDisallowedParameter(MediaType range) {
+    for (String name : range.getParameters().keySet()) {
       if (!"ext".equalsIgnoreCase(name)
           && !"profile".equalsIgnoreCase(name)
           && !"q".equalsIgnoreCase(name)) {
@@ -155,10 +197,6 @@ final class JsonApiMediaNegotiation {
       }
     }
     return false;
-  }
-
-  private static boolean isWildcard(MediaType candidate) {
-    return candidate.isWildcardType() || candidate.isWildcardSubtype();
   }
 
   private static boolean hasUnsupportedExtension(@Nullable String extValue) {
