@@ -24,9 +24,8 @@ final class JsonApiMediaNegotiation {
 
   private JsonApiMediaNegotiation() {}
 
-  static boolean isJsonApi(@Nullable MediaType candidate) {
-    return candidate != null
-        && "application".equalsIgnoreCase(candidate.getType())
+  static boolean isJsonApi(MediaType candidate) {
+    return "application".equalsIgnoreCase(candidate.getType())
         && "vnd.api+json".equalsIgnoreCase(candidate.getSubtype());
   }
 
@@ -76,7 +75,7 @@ final class JsonApiMediaNegotiation {
     boolean sawAnyValue = false;
     List<MediaType> candidates = new ArrayList<>();
     for (String rawValue : rawValues) {
-      if (rawValue == null || rawValue.isBlank()) {
+      if (rawValue.isBlank()) {
         continue;
       }
       sawAnyValue = true;

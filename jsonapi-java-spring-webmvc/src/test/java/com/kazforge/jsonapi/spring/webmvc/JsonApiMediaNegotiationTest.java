@@ -63,6 +63,45 @@ class JsonApiMediaNegotiationTest {
   }
 
   @Test
+  void getWithBlankAcceptDefaultsToJsonApi() throws Exception {
+    mockMvc
+        .perform(get("/api/articles").header(HttpHeaders.ACCEPT, ""))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, JSON_API));
+  }
+
+  @Test
+  void getIgnoresEmptyAcceptAlternative() throws Exception {
+    mockMvc
+        .perform(get("/api/articles").header(HttpHeaders.ACCEPT, JSON_API + ","))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, JSON_API));
+  }
+
+  @Test
+  void getPrefersSpecificTypeOverWildcard() throws Exception {
+    mockMvc
+        .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "application/*, " + JSON_API))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, JSON_API));
+  }
+
+  @Test
+  void getPrefersSpecificTypeRegardlessOfOrder() throws Exception {
+    mockMvc
+        .perform(get("/api/articles").header(HttpHeaders.ACCEPT, JSON_API + ", application/*"))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, JSON_API));
+  }
+
+  @Test
+  void getWithOnlyUnsupportedConcreteTypesIsNotAcceptable() throws Exception {
+    mockMvc
+        .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "application/json, text/plain"))
+        .andExpect(status().isNotAcceptable());
+  }
+
+  @Test
   void getWithApplicationWildcardSucceeds() throws Exception {
     mockMvc
         .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "application/*"))
@@ -240,6 +279,18 @@ class JsonApiMediaNegotiationTest {
   }
 
   @Test
+  void postWithoutBodySkipsContentTypeValidation() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/articles")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(new byte[0])
+                .header(HttpHeaders.ACCEPT, JSON_API))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, JSON_API));
+  }
+
+  @Test
   void methodLevelAnnotationIsNegotiated() throws Exception {
     mockMvc
         .perform(get("/mixed/resource").header(HttpHeaders.ACCEPT, JSON_API))
@@ -269,6 +320,22 @@ class JsonApiMediaNegotiationTest {
         .perform(get("/api/vary").header(HttpHeaders.ACCEPT, JSON_API))
         .andExpect(status().isOk())
         .andExpect(header().string(HttpHeaders.VARY, "Accept-Encoding, Accept"));
+  }
+
+  @Test
+  void wildcardVaryIsPreserved() throws Exception {
+    mockMvc
+        .perform(get("/api/vary-star").header(HttpHeaders.ACCEPT, JSON_API))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.VARY, "*"));
+  }
+
+  @Test
+  void existingAcceptVaryIsNotDuplicated() throws Exception {
+    mockMvc
+        .perform(get("/api/vary-accept").header(HttpHeaders.ACCEPT, JSON_API))
+        .andExpect(status().isOk())
+        .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT));
   }
 
   @JsonApiEndpoint
@@ -313,6 +380,16 @@ class JsonApiMediaNegotiationTest {
     @GetMapping("/api/vary")
     public ResponseEntity<String> vary() {
       return ResponseEntity.ok().header(HttpHeaders.VARY, "Accept-Encoding").body("{\"data\":[]}");
+    }
+
+    @GetMapping("/api/vary-star")
+    public ResponseEntity<String> varyStar() {
+      return ResponseEntity.ok().header(HttpHeaders.VARY, "*").body("{\"data\":[]}");
+    }
+
+    @GetMapping("/api/vary-accept")
+    public ResponseEntity<String> varyAccept() {
+      return ResponseEntity.ok().header(HttpHeaders.VARY, HttpHeaders.ACCEPT).body("{\"data\":[]}");
     }
   }
 }
