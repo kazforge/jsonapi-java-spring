@@ -6,9 +6,8 @@ JSON:API semantics and runtimes; this repository owns Spring-specific integratio
 
 `jsonapi-java-spring-webmvc` owns JSON:API HTTP adaptation: it provides an opt-in
 `@JsonApiEndpoint` marker whose handlers get JSON:API 1.1 request and response media
-negotiation, operation-aware request/query context, and safe protocol error translation, without affecting ordinary Spring MVC
-endpoints. [ADRs](adr/README.md) record
-durable decisions.
+negotiation, operation-aware request/query context, and safe protocol error translation,
+without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record durable decisions.
 
 ## Repository structure
 
@@ -64,40 +63,30 @@ the protocol resolver translates them without treating exception messages as pub
 
 ## Protocol errors and advanced document transport
 
-Register `JsonApiProtocolExceptionResolver` with the application's configured neutral `JsonApi`
-runtime before Spring's default exception resolvers. Application exception handlers may precede
-it. The resolver checks the selected handler's endpoint marker, not the request context, which
-may not exist when parsing fails. Negotiation rejects through Spring's typed media exceptions.
-Without the protocol resolver, Spring's normal status handling remains available.
+Register `JsonApiProtocolExceptionResolver` with a caller-supplied `JsonApi` runtime before
+Spring's default exception resolvers; application handlers may precede it. It checks the selected
+handler's endpoint marker because request context may not exist when parsing fails. Negotiation
+uses Spring's typed media exceptions, retaining default status handling without this resolver.
 
 Query and neutral document-read failures produce 400 responses; negotiation produces 406/415.
-Errors use public core `ErrorObject`, `ErrorSource`, and `JsonApiDocument` values. Diagnostic codes
-are stable enum names; titles are fixed. Query parameter names are retained when decoded, and
-media failures identify the header. Messages, rejected values, causes, class names and source
-positions are not emitted. Document pointers are omitted rather than claiming a missing or
-unverified member exists. Bare mapping/core-validation and unrelated application exceptions are
-not globally classified as client failures.
+Errors reuse core `ErrorObject`, `ErrorSource`, and `JsonApiDocument` values with fixed titles
+and diagnostic codes. Decoded query parameter names and media header names are retained;
+exception details and unverified document pointers are omitted. Unrelated application,
+mapping and core-validation exceptions are not classified globally.
 
-`JsonApiDocumentResponseWriter` is the explicit advanced response escape hatch: it accepts a
-neutral document, an explicit HTTP status and a servlet response. It is not a conventional
-controller envelope or DTO converter. Raw reads remain explicit runtime operations with a
-`DocumentReadContext`; there is no implicit any-document request binder. Both protocol errors
-and advanced responses delegate serialization to `JsonApi.documents()`, preserving runtime
-document defaults. No Spring-owned serializer or runtime discovery is introduced.
+`JsonApiDocumentResponseWriter` accepts a neutral document, explicit HTTP status and servlet
+response for advanced use, not conventional DTO binding. Raw reads require an explicit
+`DocumentReadContext` through the runtime. Serialization delegates to `JsonApi.documents()`,
+preserving runtime defaults without a Spring-owned serializer or runtime discovery.
 
-Serialization completes before response mutation. Runtime serialization failures produce a
-generic 500 error; if that also cannot serialize, the result is bodyless 500. Failures are logged
-server-side. Before emitting uncommitted output, the writer resets the servlet output mode while
-preserving existing headers; a previously selected non-UTF-8 writer cannot recode UTF-8 bytes.
-Transport I/O is never retried; committed responses are not rewritten. Responses
-use bare `application/vnd.api+json` and merge `Vary: Accept`, including error bodies on 406 even
-when the request rejected that representation. Ordinary application/domain error conveniences,
-validation mapping and resource binding remain separate future surfaces.
+Serialization finishes before response mutation. Failures are logged and produce a generic
+500, or bodyless 500 if error serialization also fails. The writer resets uncommitted output
+mode while preserving headers, then emits UTF-8 bytes; committed output is untouched and I/O
+is not retried. Responses use bare `application/vnd.api+json` and merge `Vary: Accept`, even for
+406 errors. Application-error conveniences, validation mapping and DTO binding remain separate.
 
-Compiled-class architecture tests reject Jackson, Boot, internal packages and unsupported core
-helpers. The build checks production/test dependency graphs for major-specific dependencies and
-non-released project substitution. Only public model values and the endpoint-role core contract
-are currently used directly from core. The adapter exposes no Jackson-major-specific API.
+Explicit Gradle dependencies, compilation, behavioral tests and existing CI verify this scope.
+No custom dependency or class-file scanners are used. The adapter exposes no Jackson-specific API.
 
 ## Compatibility
 

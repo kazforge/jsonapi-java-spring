@@ -26,15 +26,15 @@ Serialize before response mutation. Output failures at this serialization bounda
 500 responses, falling back to bodyless 500 if error serialization also fails. Log serialization
 failures server-side; reset uncommitted output mode while preserving headers so previously selected
 servlet writers cannot change the UTF-8 representation. Do not retry transport I/O or replace
-committed output. JSON:API error
-responses use the JSON:API media type even for 406 and merge `Vary: Accept`.
+committed output. JSON:API error responses use the JSON:API media type even for 406 and merge
+`Vary: Accept`.
 
 ## Consequences
 
 The completed public foundation comprises the endpoint marker, media interceptor/advice,
 request context/interceptor/argument resolver, protocol resolver, and explicit document writer.
 Applications register these seams explicitly and choose/configure their neutral runtime.
-Runtime document defaults are preserved by delegation. Public-core and Jackson-neutral dependency
-boundaries are enforced on compiled classes and resolved dependencies, without runtime-major
-detection or additional modules. Spring 7.0.0 minimum, current-test 7.0.9, Java 21 and Servlet
-6.1 remain unchanged. This extends ADRs 0002 and 0004; it does not supersede their request semantics.
+Runtime document defaults are preserved by delegation. Rely on explicit neutral Gradle dependencies,
+compilation, behavioral tests and existing CI rather than custom boundary scanners or extra build
+infrastructure. Spring 7.0.0 minimum, current-test 7.0.9, Java 21 and Servlet 6.1 remain unchanged.
+This extends ADRs 0002 and 0004 without changing their request semantics.
