@@ -24,23 +24,29 @@ public class JsonApiRequestContextInterceptor implements HandlerInterceptor {
   @Override
   public boolean preHandle(
       HttpServletRequest request, HttpServletResponse response, Object handler) {
+    prepareContext(request, handler);
+    return true;
+  }
+
+  private void prepareContext(HttpServletRequest request, Object handler) {
     request.removeAttribute(JsonApiRequestContext.ATTRIBUTE);
     if (!(handler instanceof HandlerMethod method)) {
-      return true;
+      return;
     }
     JsonApiEndpoint endpoint = method.getMethodAnnotation(JsonApiEndpoint.class);
     if (endpoint == null) {
       endpoint = method.getBeanType().getAnnotation(JsonApiEndpoint.class);
     }
     if (endpoint == null) {
-      return true;
+      return;
     }
     String rawQuery = request.getQueryString();
     String input = rawQuery == null ? "" : rawQuery;
     Object cached = request.getAttribute(QUERY_ATTRIBUTE);
     JsonApiQuery query;
-    if (cached instanceof CachedQuery parsed && parsed.input().equals(input)) {
-      query = parsed.query();
+    if (cached instanceof CachedQuery(var cachedInput, var cachedQuery)
+        && cachedInput.equals(input)) {
+      query = cachedQuery;
     } else {
       query = parser.parseRaw(input);
       request.setAttribute(QUERY_ATTRIBUTE, new CachedQuery(input, query));
@@ -49,7 +55,6 @@ public class JsonApiRequestContextInterceptor implements HandlerInterceptor {
         JsonApiRequestContext.ATTRIBUTE,
         new JsonApiRequestContext(
             HttpMethod.valueOf(request.getMethod()), endpoint.primaryDataContext(), query));
-    return true;
   }
 
   private record CachedQuery(String input, JsonApiQuery query) {}

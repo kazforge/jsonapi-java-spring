@@ -61,11 +61,10 @@ class JsonApiRequestContextUnitTest {
     var parameter = new MethodParameter(method, 0);
     assertTrue(resolver.supportsParameter(parameter));
     assertFalse(resolver.supportsParameter(new MethodParameter(method, 1)));
+    var unpreparedRequest = new ServletWebRequest(new MockHttpServletRequest());
     assertThrows(
         IllegalStateException.class,
-        () ->
-            resolver.resolveArgument(
-                parameter, null, new ServletWebRequest(new MockHttpServletRequest()), null));
+        () -> resolver.resolveArgument(parameter, null, unpreparedRequest, null));
     var nativeRequest =
         (NativeWebRequest)
             java.lang.reflect.Proxy.newProxyInstance(

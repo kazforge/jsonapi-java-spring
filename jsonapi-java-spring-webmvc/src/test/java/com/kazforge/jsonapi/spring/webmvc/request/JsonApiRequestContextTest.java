@@ -104,8 +104,9 @@ class JsonApiRequestContextTest {
     assertEquals(List.of("a b"), query.filter().get("filter[x]"));
     assertEquals(List.of("custom", "other"), List.copyOf(query.unprocessed().keySet()));
     assertEquals(List.of("z", ""), query.unprocessed().get("custom"));
-    assertThrows(
-        UnsupportedOperationException.class, () -> query.unprocessed().put("x", List.of()));
+    var unprocessed = query.unprocessed();
+    List<String> values = List.of();
+    assertThrows(UnsupportedOperationException.class, () -> unprocessed.put("x", values));
   }
 
   @ParameterizedTest
