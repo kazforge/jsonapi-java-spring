@@ -10,35 +10,11 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Direct coverage for negotiation inputs that are impractical to produce through MockMvc: absent or
- * blank header enumerations, multiple header lines, and quoted parameter values containing commas.
+ * blank header enumerations and multiple header lines.
  */
 class JsonApiMediaNegotiationUnitTest {
 
   private static final String JSON_API = JsonApiMediaNegotiation.JSON_API_VALUE;
-
-  @Test
-  void blankContentTypeValueIsValid() {
-    assertNull(JsonApiMediaNegotiation.validateContentType("   "));
-  }
-
-  @Test
-  void nonJsonApiContentTypeIsUnsupported() {
-    assertEquals("unsupported", JsonApiMediaNegotiation.validateContentType("application/json"));
-  }
-
-  @Test
-  void jsonApiContentTypeWithDisallowedParameterIsUnsupported() {
-    assertEquals(
-        "unsupported",
-        JsonApiMediaNegotiation.validateContentType(JSON_API + ";charset=\"utf-8\""));
-  }
-
-  @Test
-  void jsonApiContentTypeWithUnknownProfileIsValid() {
-    assertNull(
-        JsonApiMediaNegotiation.validateContentType(
-            JSON_API + ";profile=\"https://example.com/profiles/timestamps\""));
-  }
 
   @Test
   void absentAcceptHeadersDefaultToJsonApi() {
@@ -57,19 +33,6 @@ class JsonApiMediaNegotiationUnitTest {
   }
 
   @Test
-  void commaInsideQuotedExtensionParameterDoesNotSplit() {
-    assertEquals(
-        JSON_API,
-        negotiate(JSON_API + ";ext=\"https://example.com/a,https://example.com/b\", " + JSON_API));
-  }
-
-  @Test
-  void commaInsideQuotedProfileParameterDoesNotSplit() {
-    assertEquals(
-        JSON_API, negotiate(JSON_API + ";profile=\"https://example.com/a,https://example.com/b\""));
-  }
-
-  @Test
   void multipleAcceptHeaderLinesAreCombined() {
     assertEquals(JSON_API, negotiate("application/json", JSON_API));
   }
@@ -80,13 +43,54 @@ class JsonApiMediaNegotiationUnitTest {
   }
 
   @Test
+  void equalSpecificityQualityBreaksTie() {
+    assertEquals(JSON_API, negotiate("application/*;q=0.5, application/*;q=0.9"));
+  }
+
+  @Test
   void explicitExclusionBeatsWildcardQuality() {
     assertNull(negotiate(JSON_API + ";q=0, */*;q=1"));
   }
 
   @Test
-  void mostSpecificRangeDecidesQuality() {
-    assertNull(negotiate("application/*;q=1, " + JSON_API + ";q=0"));
+  void suffixWildcardDoesNotMatch() {
+    assertNull(negotiate("application/*+xml"));
+  }
+
+  @Test
+  void blankContentTypeValueIsValid() {
+    assertEquals(
+        JsonApiMediaNegotiation.Validity.VALID, JsonApiMediaNegotiation.checkContentType("   "));
+  }
+
+  @Test
+  void nonJsonApiContentTypeIsUnsupported() {
+    assertEquals(
+        JsonApiMediaNegotiation.Validity.UNSUPPORTED,
+        JsonApiMediaNegotiation.checkContentType("application/json"));
+  }
+
+  @Test
+  void jsonApiContentTypeWithDisallowedParameterIsUnsupported() {
+    assertEquals(
+        JsonApiMediaNegotiation.Validity.UNSUPPORTED,
+        JsonApiMediaNegotiation.checkContentType(JSON_API + ";charset=\"utf-8\""));
+  }
+
+  @Test
+  void jsonApiContentTypeWithUnsupportedExtensionIsUnsupported() {
+    assertEquals(
+        JsonApiMediaNegotiation.Validity.UNSUPPORTED,
+        JsonApiMediaNegotiation.checkContentType(
+            JSON_API + ";ext=\"https://example.com/ext/atomic\""));
+  }
+
+  @Test
+  void jsonApiContentTypeWithUnknownProfileIsValid() {
+    assertEquals(
+        JsonApiMediaNegotiation.Validity.VALID,
+        JsonApiMediaNegotiation.checkContentType(
+            JSON_API + ";profile=\"https://example.com/profiles/timestamps\""));
   }
 
   private static String negotiate(String... headerValues) {

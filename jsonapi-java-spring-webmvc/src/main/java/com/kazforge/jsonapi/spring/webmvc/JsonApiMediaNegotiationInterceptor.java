@@ -5,35 +5,35 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
-import org.springframework.web.servlet.ModelAndView;
 
 /**
  * Enforces JSON:API 1.1 media negotiation for {@link JsonApiEndpoint}-annotated handlers.
  *
- * <p>Validates {@code Content-Type} on requests with a body (415 on mismatch), negotiates {@code
- * Accept} (406 when nothing acceptable remains), and sets the negotiated response {@code
- * Content-Type} together with {@code Vary: Accept} before the body is written. Handlers without
- * {@link JsonApiEndpoint} are ignored, so ordinary Spring MVC endpoints are unaffected.
+ * <p>Validates the request {@code Content-Type} (415 when a body has no valid JSON:API media type)
+ * and negotiates {@code Accept} (406 when no acceptable representation remains). Handlers without
+ * {@link JsonApiEndpoint} are ignored, so ordinary Spring MVC endpoints are unaffected. {@link
+ * JsonApiMediaNegotiationAdvice} applies the negotiated response media type.
  *
- * <p>Register via {@code WebMvcConfigurer#addInterceptors}. Annotated mappings must not declare
- * {@code consumes}/{@code produces}: those checks run in handler mapping before this interceptor
- * and would bypass JSON:API handling.
+ * <p>Consumers register this interceptor in {@code WebMvcConfigurer#addInterceptors} alongside the
+ * {@link JsonApiMediaNegotiationAdvice} bean. Annotated mappings must not declare {@code consumes}
+ * or {@code produces}: handler mapping applies those before this interceptor and would respond with
+ * its own 415/406 instead of JSON:API negotiation.
  */
 public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
 
   @Override
-  public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
-      throws Exception {
+  public boolean preHandle(
+      HttpServletRequest request, HttpServletResponse response, Object handler) {
     if (!isJsonApiHandler(handler)) {
       return true;
     }
     if (hasBody(request)
         && (request.getContentType() == null
-            || JsonApiMediaNegotiation.validateContentType(request.getContentType()) != null)) {
+            || JsonApiMediaNegotiation.checkContentType(request.getContentType())
+                == JsonApiMediaNegotiation.Validity.UNSUPPORTED)) {
       response.setStatus(HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE);
       return false;
     }
@@ -47,20 +47,7 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
     return true;
   }
 
-  @Override
-  public void postHandle(
-      HttpServletRequest request,
-      HttpServletResponse response,
-      Object handler,
-      @Nullable ModelAndView modelAndView) {
-    if (!isJsonApiHandler(handler)) {
-      return;
-    }
-    mergeVary(response);
-    response.setContentType(JsonApiMediaNegotiation.JSON_API_VALUE);
-  }
-
-  private static boolean isJsonApiHandler(Object handler) {
+  static boolean isJsonApiHandler(Object handler) {
     if (!(handler instanceof HandlerMethod method)) {
       return false;
     }
@@ -69,30 +56,36 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
   }
 
   /**
-   * Whether the request carries a body. Requests without a body carry no {@code Content-Length} (or
-   * a zero length), so there is no {@code Content-Type} to validate.
+   * Whether the request carries a body. Requests without a body have no length (or a zero length);
+   * chunked requests report an unknown length instead.
    */
-  private static boolean hasBody(HttpServletRequest request) {
-    return request.getContentLengthLong() > 0;
+  static boolean hasBody(HttpServletRequest request) {
+    return request.getContentLengthLong() > 0
+        || "chunked".equalsIgnoreCase(request.getHeader(HttpHeaders.TRANSFER_ENCODING));
   }
 
-  private static void mergeVary(HttpServletResponse response) {
-    Collection<String> existing = response.getHeaders(HttpHeaders.VARY);
-    List<String> tokens = new ArrayList<>();
-    for (String value : existing) {
+  /** Adds {@code Accept} to {@code Vary} unless a broader value is already present. */
+  static void mergeVary(HttpHeaders headers) {
+    headers.put(HttpHeaders.VARY, withAccept(headers.getOrDefault(HttpHeaders.VARY, List.of())));
+  }
+
+  /** Adds {@code Accept} to the servlet response {@code Vary} header. */
+  static void mergeVary(HttpServletResponse response) {
+    response.setHeader(
+        HttpHeaders.VARY, String.join(", ", withAccept(response.getHeaders(HttpHeaders.VARY))));
+  }
+
+  private static List<String> withAccept(Collection<String> varyValues) {
+    List<String> vary = new ArrayList<>(varyValues);
+    for (String value : vary) {
       for (String token : value.split(",")) {
         String trimmed = token.trim();
-        if (!trimmed.isEmpty() && !tokens.contains(trimmed)) {
-          tokens.add(trimmed);
+        if ("*".equals(trimmed) || HttpHeaders.ACCEPT.equalsIgnoreCase(trimmed)) {
+          return vary;
         }
       }
     }
-    for (String token : tokens) {
-      if ("*".equals(token) || HttpHeaders.ACCEPT.equalsIgnoreCase(token)) {
-        return;
-      }
-    }
-    tokens.add(HttpHeaders.ACCEPT);
-    response.setHeader(HttpHeaders.VARY, String.join(", ", tokens));
+    vary.add(HttpHeaders.ACCEPT);
+    return vary;
   }
 }

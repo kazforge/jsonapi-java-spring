@@ -10,8 +10,8 @@ import java.lang.annotation.Target;
  * Marks a controller or handler method as a JSON:API endpoint subject to JSON:API 1.1 media
  * negotiation.
  *
- * <p>Apply to JSON:API controllers only. The negotiation interceptor and response advice ignore
- * handlers without this annotation, so ordinary Spring MVC endpoints remain unaffected.
+ * <p>Apply to JSON:API controllers only. The negotiation interceptor ignores handlers without this
+ * annotation, so ordinary Spring MVC endpoints remain unaffected.
  *
  * <p>Do not narrow {@code consumes} or {@code produces} on annotated mappings. Handler-mapping
  * {@code consumes}/{@code produces} checks run before the negotiation interceptor, so declaring

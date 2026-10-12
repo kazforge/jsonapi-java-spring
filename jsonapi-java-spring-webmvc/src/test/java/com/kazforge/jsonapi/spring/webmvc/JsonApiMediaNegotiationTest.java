@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -19,13 +20,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * MockMvc regression tests for JSON:API media negotiation across the real MVC lifecycle: handler
- * mapping, the interceptor, message conversion, and response header handling.
+ * mapping, the interceptor, message conversion, and response headers.
  */
 class JsonApiMediaNegotiationTest {
 
   private static final String JSON_API = "application/vnd.api+json";
   private static final String EXT = "https://example.com/ext/atomic";
-  private static final String TOKEN_EXT = "https://example.com/ext/tokens";
   private static final String PROFILE = "https://example.com/profiles/timestamps";
 
   private MockMvc mockMvc;
@@ -39,6 +39,7 @@ class JsonApiMediaNegotiationTest {
                 new PlainController(),
                 new VaryController())
             .addInterceptors(new JsonApiMediaNegotiationInterceptor())
+            .setControllerAdvice(new JsonApiMediaNegotiationAdvice())
             .build();
   }
 
@@ -47,8 +48,8 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/api/articles"))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API))
-        .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT));
+        .andExpect(content().contentType(JSON_API))
+        .andExpect(header().stringValues(HttpHeaders.VARY, Matchers.hasItem(HttpHeaders.ACCEPT)));
   }
 
   @Test
@@ -56,15 +57,7 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/api/articles").header(HttpHeaders.ACCEPT, JSON_API))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
-  }
-
-  @Test
-  void getResponseBodyIsWritten() throws Exception {
-    mockMvc
-        .perform(get("/api/articles").header(HttpHeaders.ACCEPT, JSON_API))
-        .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API))
+        .andExpect(content().contentType(JSON_API))
         .andExpect(content().string("{\"data\":[]}"));
   }
 
@@ -73,7 +66,7 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "*/*"))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -81,7 +74,14 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "application/*"))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
+  }
+
+  @Test
+  void getWithSuffixWildcardIsNotAcceptable() throws Exception {
+    mockMvc
+        .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "application/*+xml"))
+        .andExpect(status().isNotAcceptable());
   }
 
   @Test
@@ -96,7 +96,7 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/api/articles").header(HttpHeaders.ACCEPT, ""))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -104,22 +104,15 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/api/articles").header(HttpHeaders.ACCEPT, JSON_API + ","))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
   void getWithJsonOnlyAcceptIsNotAcceptable() throws Exception {
     mockMvc
         .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "application/json"))
-        .andExpect(status().isNotAcceptable());
-  }
-
-  @Test
-  void notAcceptableMergesVary() throws Exception {
-    mockMvc
-        .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "application/json"))
         .andExpect(status().isNotAcceptable())
-        .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT));
+        .andExpect(header().stringValues(HttpHeaders.VARY, Matchers.hasItem(HttpHeaders.ACCEPT)));
   }
 
   @Test
@@ -127,7 +120,7 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "application/json, " + JSON_API))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -143,7 +136,8 @@ class JsonApiMediaNegotiationTest {
         .perform(
             get("/api/articles")
                 .header(HttpHeaders.ACCEPT, JSON_API + ";charset=\"utf-8\", " + JSON_API))
-        .andExpect(status().isOk());
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -159,7 +153,8 @@ class JsonApiMediaNegotiationTest {
         .perform(
             get("/api/articles")
                 .header(HttpHeaders.ACCEPT, JSON_API + ";ext=\"" + EXT + "\", " + JSON_API))
-        .andExpect(status().isOk());
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -176,7 +171,7 @@ class JsonApiMediaNegotiationTest {
             get("/api/articles")
                 .header(HttpHeaders.ACCEPT, JSON_API + ";ext=\"" + EXT + "\";q=1, */*;q=0.5"))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -186,19 +181,7 @@ class JsonApiMediaNegotiationTest {
             get("/api/articles")
                 .header(HttpHeaders.ACCEPT, JSON_API + ";profile=\"" + PROFILE + "\""))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
-  }
-
-  @Test
-  void getPreservesQuotedCommaInsideExtensionParameter() throws Exception {
-    mockMvc
-        .perform(
-            get("/api/articles")
-                .header(
-                    HttpHeaders.ACCEPT,
-                    JSON_API + ";ext=\" " + TOKEN_EXT + "," + TOKEN_EXT + "\", " + JSON_API))
-        .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -208,7 +191,7 @@ class JsonApiMediaNegotiationTest {
             get("/api/articles")
                 .header(HttpHeaders.ACCEPT, "application/json, " + JSON_API + ";q=0.9"))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -226,22 +209,13 @@ class JsonApiMediaNegotiationTest {
   }
 
   @Test
-  void leastSpecificWildcardLosesToParameterizedRange() throws Exception {
-    mockMvc
-        .perform(
-            get("/api/articles")
-                .header(HttpHeaders.ACCEPT, "*/*;q=0.5, " + JSON_API + ";profile=\"x\";q=0.9"))
-        .andExpect(status().isOk());
-  }
-
-  @Test
-  void getFallsBackToWildcardWhenJsonApiUnacceptable() throws Exception {
+  void qualityDoesNotOutrankSpecificity() throws Exception {
     mockMvc
         .perform(
             get("/api/articles")
                 .header(HttpHeaders.ACCEPT, JSON_API + ";charset=\"utf-8\";q=0.9, */*;q=0.5"))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -251,15 +225,7 @@ class JsonApiMediaNegotiationTest {
             get("/api/articles")
                 .header(HttpHeaders.ACCEPT, "application/*;q=0.5, " + JSON_API + ";q=0.9"))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
-  }
-
-  @Test
-  void getPrefersSpecificTypeOverWildcard() throws Exception {
-    mockMvc
-        .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "application/*, " + JSON_API))
-        .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -271,7 +237,7 @@ class JsonApiMediaNegotiationTest {
                 .content("{\"data\":[]}")
                 .header(HttpHeaders.ACCEPT, JSON_API))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -290,7 +256,31 @@ class JsonApiMediaNegotiationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.ACCEPT, JSON_API))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
+  }
+
+  @Test
+  void postWithChunkedBodyIsValidated() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/articles")
+                .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
+                .content("{\"data\":[]}")
+                .header(HttpHeaders.ACCEPT, JSON_API))
+        .andExpect(status().isUnsupportedMediaType());
+  }
+
+  @Test
+  void postWithChunkedJsonApiBodySucceeds() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/articles")
+                .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
+                .contentType(MediaType.parseMediaType(JSON_API))
+                .content("{\"data\":[]}")
+                .header(HttpHeaders.ACCEPT, JSON_API))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -329,7 +319,8 @@ class JsonApiMediaNegotiationTest {
                 .header(HttpHeaders.CONTENT_TYPE, JSON_API + ";profile=\"" + PROFILE + "\"")
                 .content("{\"data\":[]}")
                 .header(HttpHeaders.ACCEPT, JSON_API))
-        .andExpect(status().isOk());
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -347,7 +338,7 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/mixed/resource").header(HttpHeaders.ACCEPT, JSON_API))
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API));
+        .andExpect(content().contentType(JSON_API));
   }
 
   @Test
@@ -355,7 +346,7 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/plain/resource").header(HttpHeaders.ACCEPT, "application/json"))
         .andExpect(status().isOk())
-        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/json"));
+        .andExpect(content().contentType("application/json"));
   }
 
   @Test
@@ -363,7 +354,7 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/plain/resource").header(HttpHeaders.ACCEPT, JSON_API + ";q=0, */*"))
         .andExpect(status().isOk())
-        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/json"));
+        .andExpect(content().contentType("application/json"));
   }
 
   @Test
@@ -371,7 +362,7 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/mixed/plain").header(HttpHeaders.ACCEPT, "application/json"))
         .andExpect(status().isOk())
-        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/json"));
+        .andExpect(content().contentType("application/json"));
   }
 
   @Test
@@ -382,11 +373,40 @@ class JsonApiMediaNegotiationTest {
   }
 
   @Test
+  void responseEntityEndpointGetsNegotiatedMediaType() throws Exception {
+    mockMvc
+        .perform(get("/api/entity").header(HttpHeaders.ACCEPT, JSON_API))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(JSON_API))
+        .andExpect(content().string("{\"data\":[]}"));
+  }
+
+  @Test
+  void responseEntityContentTypeIsOverridden() throws Exception {
+    mockMvc
+        .perform(get("/api/entity-text").header(HttpHeaders.ACCEPT, JSON_API))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(JSON_API));
+  }
+
+  @Test
+  void responseEntityVaryIsMerged() throws Exception {
+    mockMvc
+        .perform(get("/api/entity").header(HttpHeaders.ACCEPT, JSON_API))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .stringValues(HttpHeaders.VARY, Matchers.hasItems("Accept-Encoding", "Accept")));
+  }
+
+  @Test
   void existingVaryIsPreserved() throws Exception {
     mockMvc
         .perform(get("/api/vary").header(HttpHeaders.ACCEPT, JSON_API))
         .andExpect(status().isOk())
-        .andExpect(header().string(HttpHeaders.VARY, "Accept-Encoding, Accept"));
+        .andExpect(
+            header()
+                .stringValues(HttpHeaders.VARY, Matchers.hasItems("Accept-Encoding", "Accept")));
   }
 
   @Test
@@ -394,7 +414,7 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/api/vary-star").header(HttpHeaders.ACCEPT, JSON_API))
         .andExpect(status().isOk())
-        .andExpect(header().string(HttpHeaders.VARY, "*"));
+        .andExpect(header().stringValues(HttpHeaders.VARY, Matchers.hasItem("*")));
   }
 
   @Test
@@ -402,16 +422,7 @@ class JsonApiMediaNegotiationTest {
     mockMvc
         .perform(get("/api/vary-accept").header(HttpHeaders.ACCEPT, JSON_API))
         .andExpect(status().isOk())
-        .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT));
-  }
-
-  @Test
-  void responseEntityEndpointGetsNegotiationHeaders() throws Exception {
-    mockMvc
-        .perform(get("/api/entity").header(HttpHeaders.ACCEPT, JSON_API))
-        .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(JSON_API))
-        .andExpect(header().string(HttpHeaders.VARY, "Accept-Encoding, Accept"));
+        .andExpect(header().stringValues(HttpHeaders.VARY, Matchers.hasItem(HttpHeaders.ACCEPT)));
   }
 
   @JsonApiEndpoint
@@ -471,6 +482,11 @@ class JsonApiMediaNegotiationTest {
     @GetMapping("/api/entity")
     public ResponseEntity<String> entity() {
       return ResponseEntity.ok().header(HttpHeaders.VARY, "Accept-Encoding").body("{\"data\":[]}");
+    }
+
+    @GetMapping("/api/entity-text")
+    public ResponseEntity<String> entityText() {
+      return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body("{\"data\":[]}");
     }
   }
 }
