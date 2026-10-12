@@ -1,16 +1,19 @@
 package com.kazforge.jsonapi.spring.webmvc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
  * Direct coverage for negotiation inputs that are impractical to produce through MockMvc: absent or
- * blank header enumerations and multiple header lines.
+ * blank header enumerations, multiple header lines and invalid alternatives.
  */
 class JsonApiMediaNegotiationUnitTest {
 
@@ -18,13 +21,7 @@ class JsonApiMediaNegotiationUnitTest {
 
   @Test
   void absentAcceptHeadersDefaultToJsonApi() {
-    assertEquals(JSON_API, JsonApiMediaNegotiation.negotiateContentType(null));
-  }
-
-  @Test
-  void emptyAcceptHeadersDefaultToJsonApi() {
-    assertEquals(
-        JSON_API, JsonApiMediaNegotiation.negotiateContentType(Collections.emptyEnumeration()));
+    assertEquals(JSON_API, negotiate());
   }
 
   @Test
@@ -35,6 +32,12 @@ class JsonApiMediaNegotiationUnitTest {
   @Test
   void multipleAcceptHeaderLinesAreCombined() {
     assertEquals(JSON_API, negotiate("application/json", JSON_API));
+  }
+
+  @Test
+  void malformedAlternativeDoesNotDiscardValidAlternative() {
+    assertEquals(JSON_API, negotiate("not-a-media-type!!!, " + JSON_API));
+    assertEquals(JSON_API, negotiate(JSON_API + ", not-a-media-type!!!"));
   }
 
   @Test
@@ -58,39 +61,44 @@ class JsonApiMediaNegotiationUnitTest {
   }
 
   @Test
-  void blankContentTypeValueIsValid() {
-    assertEquals(
-        JsonApiMediaNegotiation.Validity.VALID, JsonApiMediaNegotiation.checkContentType("   "));
+  void blankContentTypeValueIsInvalid() {
+    assertFalse(JsonApiMediaNegotiation.isValidContentType("   "));
   }
 
   @Test
-  void nonJsonApiContentTypeIsUnsupported() {
-    assertEquals(
-        JsonApiMediaNegotiation.Validity.UNSUPPORTED,
-        JsonApiMediaNegotiation.checkContentType("application/json"));
+  void nonJsonApiContentTypeIsInvalid() {
+    assertFalse(JsonApiMediaNegotiation.isValidContentType("application/json"));
   }
 
   @Test
-  void jsonApiContentTypeWithDisallowedParameterIsUnsupported() {
-    assertEquals(
-        JsonApiMediaNegotiation.Validity.UNSUPPORTED,
-        JsonApiMediaNegotiation.checkContentType(JSON_API + ";charset=\"utf-8\""));
+  void jsonApiContentTypeWithDisallowedParameterIsInvalid() {
+    assertFalse(JsonApiMediaNegotiation.isValidContentType(JSON_API + ";charset=\"utf-8\""));
   }
 
   @Test
-  void jsonApiContentTypeWithUnsupportedExtensionIsUnsupported() {
-    assertEquals(
-        JsonApiMediaNegotiation.Validity.UNSUPPORTED,
-        JsonApiMediaNegotiation.checkContentType(
+  void jsonApiContentTypeWithUnsupportedExtensionIsInvalid() {
+    assertFalse(
+        JsonApiMediaNegotiation.isValidContentType(
             JSON_API + ";ext=\"https://example.com/ext/atomic\""));
   }
 
   @Test
   void jsonApiContentTypeWithUnknownProfileIsValid() {
-    assertEquals(
-        JsonApiMediaNegotiation.Validity.VALID,
-        JsonApiMediaNegotiation.checkContentType(
+    assertTrue(
+        JsonApiMediaNegotiation.isValidContentType(
             JSON_API + ";profile=\"https://example.com/profiles/timestamps\""));
+  }
+
+  @Test
+  void chunkedTransferEncodingWithKnownLengthIsABody() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.addHeader("Transfer-Encoding", "gzip, chunked");
+    assertTrue(JsonApiMediaNegotiationInterceptor.hasBody(request));
+  }
+
+  @Test
+  void requestWithoutBodyHasNoBody() {
+    assertFalse(JsonApiMediaNegotiationInterceptor.hasBody(new MockHttpServletRequest()));
   }
 
   private static String negotiate(String... headerValues) {

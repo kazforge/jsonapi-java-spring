@@ -30,10 +30,7 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
     if (!isJsonApiHandler(handler)) {
       return true;
     }
-    if (hasBody(request)
-        && (request.getContentType() == null
-            || JsonApiMediaNegotiation.checkContentType(request.getContentType())
-                == JsonApiMediaNegotiation.Validity.UNSUPPORTED)) {
+    if (hasBody(request) && !hasValidContentType(request)) {
       response.setStatus(HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE);
       return false;
     }
@@ -44,6 +41,10 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
       response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
       return false;
     }
+    // Committing the negotiated type makes message conversion use it directly, so a malformed
+    // alternative elsewhere in Accept cannot fail content negotiation downstream.
+    response.setContentType(negotiated);
+    mergeVary(response);
     return true;
   }
 
@@ -56,12 +57,29 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
   }
 
   /**
-   * Whether the request carries a body. Requests without a body have no length (or a zero length);
-   * chunked requests report an unknown length instead.
+   * Whether the request carries a body. Only {@code Content-Length} and {@code Transfer-Encoding}
+   * are inspected; a body of unknown length without chunked framing (for example raw HTTP/2 DATA)
+   * is not detected here.
    */
   static boolean hasBody(HttpServletRequest request) {
-    return request.getContentLengthLong() > 0
-        || "chunked".equalsIgnoreCase(request.getHeader(HttpHeaders.TRANSFER_ENCODING));
+    if (request.getContentLengthLong() > 0) {
+      return true;
+    }
+    String transferEncoding = request.getHeader(HttpHeaders.TRANSFER_ENCODING);
+    if (transferEncoding == null) {
+      return false;
+    }
+    for (String token : transferEncoding.split(",")) {
+      if ("chunked".equalsIgnoreCase(token.trim())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean hasValidContentType(HttpServletRequest request) {
+    String contentType = request.getContentType();
+    return contentType != null && JsonApiMediaNegotiation.isValidContentType(contentType);
   }
 
   /** Adds {@code Accept} to {@code Vary} unless a broader value is already present. */

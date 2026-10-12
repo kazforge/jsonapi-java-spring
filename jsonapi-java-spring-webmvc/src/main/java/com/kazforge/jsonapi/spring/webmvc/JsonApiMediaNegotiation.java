@@ -4,8 +4,9 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
-import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
+import org.springframework.util.MimeTypeUtils;
+import org.springframework.util.StringUtils;
 
 /**
  * JSON:API 1.1 media-type rules used by {@link JsonApiMediaNegotiationInterceptor}.
@@ -27,33 +28,26 @@ final class JsonApiMediaNegotiation {
 
   private JsonApiMediaNegotiation() {}
 
-  enum Validity {
-    VALID,
-    UNSUPPORTED
-  }
-
-  static Validity checkContentType(@Nullable String contentTypeValue) {
-    if (contentTypeValue == null || contentTypeValue.isBlank()) {
-      return Validity.VALID;
+  /** Whether a request body's JSON:API {@code Content-Type} value is acceptable. */
+  static boolean isValidContentType(String contentTypeValue) {
+    if (contentTypeValue.isBlank()) {
+      return false;
     }
     MediaType contentType;
     try {
       contentType = MediaType.parseMediaType(contentTypeValue);
     } catch (IllegalArgumentException ex) {
-      return Validity.UNSUPPORTED;
+      return false;
     }
     if (!JSON_API.includes(contentType.removeQualityValue())) {
-      return Validity.UNSUPPORTED;
+      return false;
     }
     for (String name : contentType.getParameters().keySet()) {
       if (!EXT.equalsIgnoreCase(name) && !PROFILE.equalsIgnoreCase(name)) {
-        return Validity.UNSUPPORTED;
+        return false;
       }
     }
-    if (hasUnsupportedExtension(contentType.getParameter(EXT))) {
-      return Validity.UNSUPPORTED;
-    }
-    return Validity.VALID;
+    return !hasUnsupportedExtension(contentType.getParameter(EXT));
   }
 
   /**
@@ -61,19 +55,17 @@ final class JsonApiMediaNegotiation {
    * null} when the server must respond 406. Accept ranking follows RFC 9110 precedence: the most
    * specific matching range decides, and quality values break ties.
    */
-  static @Nullable String negotiateContentType(@Nullable Enumeration<String> acceptHeaders) {
+  static @Nullable String negotiateContentType(Enumeration<String> acceptHeaders) {
     List<String> rawValues = new ArrayList<>();
-    if (acceptHeaders != null) {
-      while (acceptHeaders.hasMoreElements()) {
-        rawValues.add(acceptHeaders.nextElement());
-      }
+    while (acceptHeaders.hasMoreElements()) {
+      rawValues.add(acceptHeaders.nextElement());
     }
-    if (rawValues.stream().allMatch(String::isBlank)) {
+    if (rawValues.stream().noneMatch(StringUtils::hasText)) {
       return JSON_API_VALUE;
     }
     List<MediaType> matching = new ArrayList<>();
     for (String rawValue : rawValues) {
-      for (MediaType range : parseAcceptableRanges(rawValue)) {
+      for (MediaType range : parseAcceptRange(rawValue)) {
         if (matchesJsonApi(range)) {
           matching.add(range);
         }
@@ -83,13 +75,21 @@ final class JsonApiMediaNegotiation {
     return mostSpecific != null && mostSpecific.getQualityValue() > 0.0 ? JSON_API_VALUE : null;
   }
 
-  /** Malformed alternatives are ignored, as required for JSON:API and HTTP clients in general. */
-  private static List<MediaType> parseAcceptableRanges(String rawValue) {
-    try {
-      return MediaType.parseMediaTypes(rawValue);
-    } catch (InvalidMediaTypeException ex) {
-      return List.of();
+  /**
+   * Parses one Accept header value. Spring tokenizes alternatives quote-aware; each alternative is
+   * parsed on its own so a single malformed alternative never discards valid alternatives in the
+   * same header.
+   */
+  private static List<MediaType> parseAcceptRange(String rawValue) {
+    List<MediaType> ranges = new ArrayList<>();
+    for (String token : MimeTypeUtils.tokenize(rawValue)) {
+      try {
+        ranges.add(MediaType.parseMediaType(token));
+      } catch (IllegalArgumentException ex) {
+        // A malformed alternative is ignored, per JSON:API and general HTTP client behavior.
+      }
     }
+    return ranges;
   }
 
   /**
@@ -140,7 +140,7 @@ final class JsonApiMediaNegotiation {
   }
 
   private static boolean hasUnsupportedExtension(@Nullable String extValue) {
-    // No extensions are supported in this slice, so any listed URI is unsupported.
+    // No extensions are supported, so any listed URI is unsupported.
     return extValue != null && !extValue.isBlank();
   }
 }

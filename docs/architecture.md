@@ -30,8 +30,7 @@ core source or internal packages.
 
 The WebMVC module exposes `jsonapi-java-api:0.2.0`, Spring WebMVC, and the Servlet 6.1 API
 as API dependencies.
-Production and test dependencies contain no Jackson runtime. Publication configuration and
-real consumer integration tests are separate work.
+Production and test dependencies contain no Jackson runtime.
 
 ## Compatibility
 

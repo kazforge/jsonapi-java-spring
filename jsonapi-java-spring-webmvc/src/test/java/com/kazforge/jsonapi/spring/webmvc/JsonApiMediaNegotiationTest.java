@@ -124,6 +124,14 @@ class JsonApiMediaNegotiationTest {
   }
 
   @Test
+  void getIgnoresMalformedAlternativeBesideValidJsonApi() throws Exception {
+    mockMvc
+        .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "garbage!!!, " + JSON_API))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(JSON_API));
+  }
+
+  @Test
   void getWithOnlyInvalidAcceptIsNotAcceptable() throws Exception {
     mockMvc
         .perform(get("/api/articles").header(HttpHeaders.ACCEPT, "not-a-media-type!!!"))
