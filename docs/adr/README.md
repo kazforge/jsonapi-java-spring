@@ -10,3 +10,4 @@ their replacements. See [Architecture](../architecture.md) for current structure
 | [0002 — Neutral WebMVC adapter boundary](0002-neutral-webmvc-adapter-boundary.md) | Accepted |
 | [0003 — Spring Framework compatibility policy](0003-spring-framework-compatibility-policy.md) | Accepted |
 | [0004 — Operation-aware request and query context](0004-operation-aware-request-and-query-context.md) | Accepted |
+| [0005 — Safe protocol errors and explicit document transport](0005-safe-protocol-errors-and-explicit-document-transport.md) | Accepted |

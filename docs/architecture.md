@@ -6,7 +6,7 @@ JSON:API semantics and runtimes; this repository owns Spring-specific integratio
 
 `jsonapi-java-spring-webmvc` owns JSON:API HTTP adaptation: it provides an opt-in
 `@JsonApiEndpoint` marker whose handlers get JSON:API 1.1 request and response media
-negotiation and operation-aware request/query context, without affecting ordinary Spring MVC
+negotiation, operation-aware request/query context, and safe protocol error translation, without affecting ordinary Spring MVC
 endpoints. [ADRs](adr/README.md) record
 durable decisions.
 
@@ -17,7 +17,7 @@ durable decisions.
 | `settings.gradle.kts` | Module membership and dependency repositories. |
 | Root build | Build/quality orchestration and Sonar configuration. |
 | `build-logic` | Reusable formatting and Java library quality conventions. |
-| `jsonapi-java-spring-webmvc` | Neutral WebMVC adapter: opt-in media negotiation and request/query context. |
+| `jsonapi-java-spring-webmvc` | Neutral WebMVC foundation: media negotiation, request/query context, protocol errors, and explicit document responses. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
 | `docs` | Architecture and decision records. |
@@ -36,7 +36,8 @@ Production and test dependencies contain no Jackson runtime.
 ## Request boundary
 
 `@JsonApiEndpoint` stays in `com.kazforge.jsonapi.spring.webmvc`; media negotiation lives
-in `.media` and request context in `.request`. Both implementation packages are null-marked.
+in `.media`, request context in `.request`, protocol translation in `.error`, and explicit
+document response transport in `.document`. Production packages are null-marked.
 
 Applications register `JsonApiMediaNegotiationInterceptor` before
 `JsonApiRequestContextInterceptor`, plus `JsonApiMediaNegotiationAdvice` as a bean and
@@ -58,8 +59,43 @@ Ordinary handlers clear the dispatch context. Representation selection is the qu
 neutral value, not a separate Spring model or effective authorization decision.
 
 Page/filter/custom values remain opaque. Applications own query execution, endpoint support
-policy, authorization, and route identity. Parser exceptions propagate unchanged; foundation
-protocol error rendering remains follow-up work, not a default error response in this slice.
+policy, authorization, and route identity. Parser exceptions retain their neutral diagnostics;
+the protocol resolver translates them without treating exception messages as public contracts.
+
+## Protocol errors and advanced document transport
+
+Register `JsonApiProtocolExceptionResolver` with the application's configured neutral `JsonApi`
+runtime before Spring's default exception resolvers. Application exception handlers may precede
+it. The resolver checks the selected handler's endpoint marker, not the request context, which
+may not exist when parsing fails. Negotiation rejects through Spring's typed media exceptions.
+Without the protocol resolver, Spring's normal status handling remains available.
+
+Query and neutral document-read failures produce 400 responses; negotiation produces 406/415.
+Errors use public core `ErrorObject`, `ErrorSource`, and `JsonApiDocument` values. Diagnostic codes
+are stable enum names; titles are fixed. Query parameter names are retained when decoded, and
+media failures identify the header. Messages, rejected values, causes, class names and source
+positions are not emitted. Document pointers are omitted rather than claiming a missing or
+unverified member exists. Bare mapping/core-validation and unrelated application exceptions are
+not globally classified as client failures.
+
+`JsonApiDocumentResponseWriter` is the explicit advanced response escape hatch: it accepts a
+neutral document, an explicit HTTP status and a servlet response. It is not a conventional
+controller envelope or DTO converter. Raw reads remain explicit runtime operations with a
+`DocumentReadContext`; there is no implicit any-document request binder. Both protocol errors
+and advanced responses delegate serialization to `JsonApi.documents()`, preserving runtime
+document defaults. No Spring-owned serializer or runtime discovery is introduced.
+
+Serialization completes before response mutation. Runtime serialization failures produce a
+generic 500 error; if that also cannot serialize, the result is bodyless 500. Failures are logged
+server-side. Transport I/O is never retried; committed responses are not rewritten. Responses
+use bare `application/vnd.api+json` and merge `Vary: Accept`, including error bodies on 406 even
+when the request rejected that representation. Ordinary application/domain error conveniences,
+validation mapping and resource binding remain separate future surfaces.
+
+Compiled-class architecture tests reject Jackson, Boot, internal packages and unsupported core
+helpers. The build checks production/test dependency graphs for major-specific dependencies and
+non-released project substitution. Only public model values and the endpoint-role core contract
+are currently used directly from core. The adapter exposes no Jackson-major-specific API.
 
 ## Compatibility
 

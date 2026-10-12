@@ -31,3 +31,32 @@ tasks.test {
         },
     )
 }
+
+val verifyNeutralDependencies =
+    tasks.register("verifyNeutralDependencies") {
+        doLast {
+            listOf("compileClasspath", "runtimeClasspath", "testRuntimeClasspath").forEach { name ->
+                val root =
+                    configurations
+                        .getByName(name)
+                        .incoming.resolutionResult.rootComponent
+                        .get()
+                        .id
+                configurations.getByName(name).incoming.resolutionResult.allComponents.forEach { component ->
+                    val id = component.id
+                    if (id is org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
+                        check(
+                            !id.group.startsWith("com.fasterxml.jackson") &&
+                                !id.group.startsWith("tools.jackson") &&
+                                id.group != "org.springframework.boot" &&
+                                !(id.group == "com.kazforge" && id.module.contains("jackson")),
+                        ) { "Non-neutral dependency in $name: $id" }
+                    } else {
+                        check(id == root) { "Non-released dependency in $name: $id" }
+                    }
+                }
+            }
+        }
+    }
+
+tasks.check { dependsOn(verifyNeutralDependencies) }
