@@ -1,5 +1,6 @@
-package com.kazforge.jsonapi.spring.webmvc;
+package com.kazforge.jsonapi.spring.webmvc.media;
 
+import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
 import java.lang.reflect.Method;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.MethodParameter;

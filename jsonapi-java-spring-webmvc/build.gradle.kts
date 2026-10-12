@@ -9,6 +9,7 @@ require(springTestVersion in setOf("minimum", "current")) {
 
 dependencies {
     api(libs.jsonapi.api)
+    api(libs.jsonapi.query)
     api(libs.spring.webmvc)
     api(libs.servlet.api)
     testImplementation(libs.spring.test)

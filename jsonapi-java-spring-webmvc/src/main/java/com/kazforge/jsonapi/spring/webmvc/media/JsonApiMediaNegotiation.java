@@ -1,4 +1,4 @@
-package com.kazforge.jsonapi.spring.webmvc;
+package com.kazforge.jsonapi.spring.webmvc.media;
 
 import java.util.ArrayList;
 import java.util.Enumeration;

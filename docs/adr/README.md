@@ -9,3 +9,4 @@ their replacements. See [Architecture](../architecture.md) for current structure
 | [0001 — Separate Spring companion product](0001-separate-spring-companion-product.md) | Accepted |
 | [0002 — Neutral WebMVC adapter boundary](0002-neutral-webmvc-adapter-boundary.md) | Accepted |
 | [0003 — Spring Framework compatibility policy](0003-spring-framework-compatibility-policy.md) | Accepted |
+| [0004 — Operation-aware request and query context](0004-operation-aware-request-and-query-context.md) | Accepted |
