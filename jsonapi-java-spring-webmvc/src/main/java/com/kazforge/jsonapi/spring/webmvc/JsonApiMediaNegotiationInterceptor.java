@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.http.HttpHeaders;
+import org.springframework.util.StringUtils;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -57,24 +58,13 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
   }
 
   /**
-   * Whether the request carries a body. Only {@code Content-Length} and {@code Transfer-Encoding}
-   * are inspected; a body of unknown length without chunked framing (for example raw HTTP/2 DATA)
-   * is not detected here.
+   * Whether the request carries a body. A positive {@code Content-Length} or any {@code
+   * Transfer-Encoding} (including composite values such as {@code gzip, chunked}) indicates a body;
+   * a body with neither, such as raw HTTP/2 DATA frames, is not detected here.
    */
   static boolean hasBody(HttpServletRequest request) {
-    if (request.getContentLengthLong() > 0) {
-      return true;
-    }
-    String transferEncoding = request.getHeader(HttpHeaders.TRANSFER_ENCODING);
-    if (transferEncoding == null) {
-      return false;
-    }
-    for (String token : transferEncoding.split(",")) {
-      if ("chunked".equalsIgnoreCase(token.trim())) {
-        return true;
-      }
-    }
-    return false;
+    return request.getContentLengthLong() > 0
+        || StringUtils.hasText(request.getHeader(HttpHeaders.TRANSFER_ENCODING));
   }
 
   private static boolean hasValidContentType(HttpServletRequest request) {

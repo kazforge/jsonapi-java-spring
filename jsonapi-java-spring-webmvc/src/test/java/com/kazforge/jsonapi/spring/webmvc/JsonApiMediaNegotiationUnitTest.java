@@ -90,9 +90,16 @@ class JsonApiMediaNegotiationUnitTest {
   }
 
   @Test
-  void chunkedTransferEncodingWithKnownLengthIsABody() {
+  void compositeTransferEncodingIsABody() {
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.addHeader("Transfer-Encoding", "gzip, chunked");
+    assertTrue(JsonApiMediaNegotiationInterceptor.hasBody(request));
+  }
+
+  @Test
+  void positiveContentLengthIsABody() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setContent(new byte[] {1});
     assertTrue(JsonApiMediaNegotiationInterceptor.hasBody(request));
   }
 
