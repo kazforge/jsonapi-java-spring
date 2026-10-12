@@ -1,4 +1,4 @@
-package com.kazforge.jsonapi.spring.webmvc;
+package com.kazforge.jsonapi.spring.webmvc.media;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

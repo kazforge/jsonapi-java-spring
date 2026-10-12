@@ -1,5 +1,6 @@
-package com.kazforge.jsonapi.spring.webmvc;
+package com.kazforge.jsonapi.spring.webmvc.media;
 
+import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
