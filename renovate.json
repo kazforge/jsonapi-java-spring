@@ -5,8 +5,13 @@
   ],
   "packageRules": [
     {
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["java-jdk"],
+      "enabled": false
+    },
+    {
       "matchManagers": ["gradle"],
-      "matchDepNames": ["org.springframework:spring-webmvc"],
+      "matchDepNames": ["org.springframework:spring-webmvc", "org.springframework:spring-test"],
       "enabled": false
     },
     {
