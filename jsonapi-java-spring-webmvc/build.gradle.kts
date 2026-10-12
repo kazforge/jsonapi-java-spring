@@ -34,6 +34,8 @@ tasks.test {
 
 val verifyNeutralDependencies =
     tasks.register("verifyNeutralDependencies") {
+        group = "verification"
+        description = "Verifies released public dependencies and Jackson-major neutrality."
         doLast {
             listOf("compileClasspath", "runtimeClasspath", "testRuntimeClasspath").forEach { name ->
                 val root =

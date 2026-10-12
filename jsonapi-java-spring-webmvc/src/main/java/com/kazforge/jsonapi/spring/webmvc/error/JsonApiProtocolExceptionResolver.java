@@ -64,12 +64,12 @@ public final class JsonApiProtocolExceptionResolver implements HandlerExceptionR
 
   private static @Nullable ErrorObject translate(Exception exception) {
     if (exception instanceof JsonApiQueryException query) {
+      String parameterName = query.parameterName();
       return ErrorObject.builder()
           .status("400")
           .code(query.diagnostic().name())
           .title("Invalid query parameter")
-          .source(
-              query.parameterName() == null ? null : ErrorSource.ofParameter(query.parameterName()))
+          .source(parameterName == null ? null : ErrorSource.ofParameter(parameterName))
           .build();
     }
     if (exception instanceof JsonApiDocumentReadException read) {

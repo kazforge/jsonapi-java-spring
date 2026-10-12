@@ -172,6 +172,116 @@ class JsonApiProtocolTest {
     assertEquals("application/vnd.api+json", response.getHeader("Content-Type"));
   }
 
+  @ParameterizedTest
+  @CsvSource({"UTF-8", "UTF-16", "ISO-8859-1"})
+  void selectedWriterCannotRecodeProtocolErrors(String encoding) throws Exception {
+    var response = new ModeAwareResponse();
+    response.setCharacterEncoding(encoding);
+    response.getWriter().write("discarded secret");
+    response.setHeader("Access-Control-Allow-Origin", "https://example.com");
+    response.setHeader("Vary", "Origin");
+    response.addHeader("Set-Cookie", "first=1");
+    response.addHeader("Set-Cookie", "second=2");
+    response.setContentLength(999);
+    runtime.json = "{\"errors\":[{\"title\":\"café 日本語\"}]}";
+    var resolver = new JsonApiProtocolExceptionResolver(runtime);
+    var handler = new HandlerMethod(new Controller(), "api", JsonApiRequestContext.class);
+    assertNotNull(
+        resolver.resolveException(
+            new MockHttpServletRequest(),
+            response,
+            handler,
+            new JsonApiDocumentReadException(
+                CodecFailureCategory.MALFORMED_JSON, "", SourceLocation.UNKNOWN, "secret")));
+    assertEquals(400, response.getStatus());
+    assertArrayEquals(
+        runtime.json.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        response.getContentAsByteArray());
+    assertEquals("application/vnd.api+json", response.getContentType());
+    assertEquals(response.getContentAsByteArray().length, response.getContentLength());
+    assertEquals("https://example.com", response.getHeader("Access-Control-Allow-Origin"));
+    assertEquals(List.of("first=1", "second=2"), List.copyOf(response.getHeaders("Set-Cookie")));
+    assertEquals(List.of("Origin", "Accept"), List.copyOf(response.getHeaders("Vary")));
+  }
+
+  @Test
+  void committedWriterIsUntouchedAndTransportFailuresAreNotRetried() throws Exception {
+    var response = new ModeAwareResponse();
+    response.setCharacterEncoding("UTF-16");
+    response.getWriter().write("existing");
+    response.flushBuffer();
+    int calls = runtime.calls;
+    new JsonApiDocumentResponseWriter(runtime).write(runtime.last, 400, response);
+    assertEquals(calls, runtime.calls);
+    assertEquals(0, response.streamSelections);
+
+    var broken =
+        new ModeAwareResponse() {
+          @Override
+          public jakarta.servlet.ServletOutputStream getOutputStream() {
+            super.getOutputStream();
+            return new jakarta.servlet.ServletOutputStream() {
+              @Override
+              public boolean isReady() {
+                return true;
+              }
+
+              @Override
+              public void setWriteListener(jakarta.servlet.WriteListener listener) {}
+
+              @Override
+              public void write(int value) throws IOException {
+                throw new IOException("transport failure");
+              }
+            };
+          }
+        };
+    var resolver = new JsonApiProtocolExceptionResolver(runtime);
+    assertNotNull(
+        resolver.resolveException(
+            new MockHttpServletRequest(),
+            broken,
+            new HandlerMethod(new Controller(), "api", JsonApiRequestContext.class),
+            new JsonApiDocumentReadException(
+                CodecFailureCategory.MALFORMED_JSON, "", SourceLocation.UNKNOWN, "secret")));
+    assertEquals(1, broken.streamSelections);
+    assertEquals(500, broken.getStatus());
+    assertEquals(0, broken.getContentAsByteArray().length);
+  }
+
+  // Spring's mock does not enforce servlet writer/stream exclusion; this fixture does.
+  static class ModeAwareResponse extends MockHttpServletResponse {
+    private boolean writerSelected;
+    private boolean streamSelected;
+    int streamSelections;
+
+    @Override
+    public PrintWriter getWriter() throws UnsupportedEncodingException {
+      if (streamSelected) {
+        throw new IllegalStateException("Output stream already selected");
+      }
+      writerSelected = true;
+      return super.getWriter();
+    }
+
+    @Override
+    public jakarta.servlet.ServletOutputStream getOutputStream() {
+      if (writerSelected) {
+        throw new IllegalStateException("Writer already selected");
+      }
+      streamSelected = true;
+      streamSelections++;
+      return super.getOutputStream();
+    }
+
+    @Override
+    public void reset() {
+      super.reset();
+      writerSelected = false;
+      streamSelected = false;
+    }
+  }
+
   @JsonApiEndpoint
   @RestController
   static class AdvancedController {
@@ -208,7 +318,9 @@ class JsonApiProtocolTest {
 
     @JsonApiEndpoint
     @GetMapping("/read")
-    public String read() {
+    public String read(jakarta.servlet.http.HttpServletResponse response) throws IOException {
+      response.setCharacterEncoding("UTF-16");
+      response.getWriter().write("discarded secret");
       throw new JsonApiDocumentReadException(
           CodecFailureCategory.MALFORMED_JSON, "", SourceLocation.UNKNOWN, "secret");
     }
@@ -231,6 +343,7 @@ class JsonApiProtocolTest {
     JsonApiDocument last = JsonApiDocument.withError(ErrorObject.ofTitle("Initial"));
     int failures;
     int calls;
+    String json = "{\"errors\":[{\"title\":\"Safe error\"}],\"jsonapi\":{\"version\":\"1.1\"}}";
 
     ErrorObject error() {
       return Objects.requireNonNull(last.errors()).getFirst();
@@ -264,7 +377,7 @@ class JsonApiProtocolTest {
         failures--;
         throw new IllegalStateException("secret");
       }
-      return "{\"errors\":[{\"title\":\"Safe error\"}],\"jsonapi\":{\"version\":\"1.1\"}}";
+      return json;
     }
 
     @Override

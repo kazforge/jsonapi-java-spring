@@ -16,10 +16,6 @@ class FoundationBoundaryTest {
           "com/kazforge/jsonapi/jackson",
           "org/springframework/boot/",
           "/internal/");
-  private static final List<String> PUBLIC_CORE =
-      List.of(
-          "com/kazforge/jsonapi/core/model/",
-          "com/kazforge/jsonapi/core/validation/PrimaryDataContext");
 
   @Test
   void compiledProductionReferencesStayNeutralAndPublic() throws Exception {
@@ -62,7 +58,8 @@ class FoundationBoundaryTest {
             .results()
             .toList()) {
       assertTrue(
-          PUBLIC_CORE.stream().anyMatch(allowed -> match.group().startsWith(allowed)),
+          match.group().startsWith("com/kazforge/jsonapi/core/model/")
+              || match.group().equals("com/kazforge/jsonapi/core/validation/PrimaryDataContext"),
           origin + " references unsupported core API " + reference);
     }
   }
@@ -76,5 +73,11 @@ class FoundationBoundaryTest {
     assertThrows(
         AssertionError.class,
         () -> checkReference("com/kazforge/jsonapi/core/validation/LocalValidation", "fixture"));
+    assertThrows(
+        AssertionError.class,
+        () ->
+            checkReference(
+                "com/kazforge/jsonapi/core/validation/PrimaryDataContextInternal", "fixture"));
+    checkReference("com/kazforge/jsonapi/core/validation/PrimaryDataContext", "fixture");
   }
 }

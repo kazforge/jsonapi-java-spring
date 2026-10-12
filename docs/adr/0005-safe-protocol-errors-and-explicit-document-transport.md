@@ -24,7 +24,9 @@ request binding is added. Conventional DTO binding and application error helpers
 
 Serialize before response mutation. Output failures at this serialization boundary are safe
 500 responses, falling back to bodyless 500 if error serialization also fails. Log serialization
-failures server-side; do not retry transport I/O or replace committed output. JSON:API error
+failures server-side; reset uncommitted output mode while preserving headers so previously selected
+servlet writers cannot change the UTF-8 representation. Do not retry transport I/O or replace
+committed output. JSON:API error
 responses use the JSON:API media type even for 406 and merge `Vary: Accept`.
 
 ## Consequences

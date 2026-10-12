@@ -6,6 +6,9 @@ import com.kazforge.jsonapi.core.model.JsonApiDocument;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.http.HttpHeaders;
 
@@ -25,7 +28,9 @@ public final class JsonApiDocumentResponseWriter {
   /**
    * Writes a document with an explicit HTTP status. Serialization completes before response
    * mutation. Serialization failures produce a safe 500; a failure writing that error produces a
-   * bodyless 500. Committed responses are not rewritten, and transport I/O failures propagate.
+   * bodyless 500. Uncommitted output mode is reset, preserving headers, so even a previously
+   * selected non-UTF-8 servlet writer cannot recode the body. Committed responses are not
+   * rewritten, and transport I/O failures propagate.
    */
   public void write(JsonApiDocument document, int status, HttpServletResponse response)
       throws IOException {
@@ -58,7 +63,7 @@ public final class JsonApiDocumentResponseWriter {
         body = new byte[0];
       }
     }
-    response.resetBuffer();
+    resetOutput(response);
     response.setStatus(selectedStatus);
     // A servlet filter may have set a charset; JSON:API does not permit that media parameter.
     response.setCharacterEncoding((String) null);
@@ -70,6 +75,17 @@ public final class JsonApiDocumentResponseWriter {
 
   private byte[] serialize(JsonApiDocument document) {
     return runtime.documents().write(document).getBytes(StandardCharsets.UTF_8);
+  }
+
+  private static void resetOutput(HttpServletResponse response) {
+    Map<String, List<String>> headers = new LinkedHashMap<>();
+    for (String name : response.getHeaderNames()) {
+      headers.put(name, List.copyOf(response.getHeaders(name)));
+    }
+    // resetBuffer does not clear the selected writer/stream. A full reset does; retain headers
+    // such as CORS, cookies and Vary, then overwrite body-specific metadata for the new response.
+    response.reset();
+    headers.forEach((name, values) -> values.forEach(value -> response.addHeader(name, value)));
   }
 
   private static void mergeVary(HttpServletResponse response) {

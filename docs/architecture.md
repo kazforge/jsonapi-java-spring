@@ -87,7 +87,9 @@ document defaults. No Spring-owned serializer or runtime discovery is introduced
 
 Serialization completes before response mutation. Runtime serialization failures produce a
 generic 500 error; if that also cannot serialize, the result is bodyless 500. Failures are logged
-server-side. Transport I/O is never retried; committed responses are not rewritten. Responses
+server-side. Before emitting uncommitted output, the writer resets the servlet output mode while
+preserving existing headers; a previously selected non-UTF-8 writer cannot recode UTF-8 bytes.
+Transport I/O is never retried; committed responses are not rewritten. Responses
 use bare `application/vnd.api+json` and merge `Vary: Accept`, including error bodies on 406 even
 when the request rejected that representation. Ordinary application/domain error conveniences,
 validation mapping and resource binding remain separate future surfaces.
