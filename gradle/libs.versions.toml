@@ -10,7 +10,7 @@ jacoco = "0.8.15"
 sonarqube = "7.5.0.8588"
 jsonapi = "0.2.0"
 # Consumer compatibility floor; changes require a maintainer decision.
-spring-minimum = "7.0.0"
+spring-minimum = "7.0.9"
 # Test-only forward compatibility target.
 spring-current = "7.0.9"
 
