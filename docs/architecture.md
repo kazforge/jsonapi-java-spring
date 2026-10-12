@@ -4,8 +4,10 @@
 [jsonapi-java](https://github.com/kazforge/jsonapi-java). Core owns framework-neutral
 JSON:API semantics and runtimes; this repository owns Spring-specific integration.
 
-`jsonapi-java-spring-webmvc` establishes the module and dependency baseline, with no
-runtime behavior or public integration API. [ADRs](adr/README.md) record durable decisions.
+`jsonapi-java-spring-webmvc` owns JSON:API HTTP adaptation: it provides an opt-in
+`@JsonApiEndpoint` marker whose handlers get JSON:API 1.1 request and response media
+negotiation, without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record
+durable decisions.
 
 ## Repository structure
 
@@ -14,7 +16,7 @@ runtime behavior or public integration API. [ADRs](adr/README.md) record durable
 | `settings.gradle.kts` | Module membership and dependency repositories. |
 | Root build | Build/quality orchestration and Sonar configuration. |
 | `build-logic` | Reusable formatting and Java library quality conventions. |
-| `jsonapi-java-spring-webmvc` | Neutral WebMVC module and Spring-version baseline. |
+| `jsonapi-java-spring-webmvc` | Neutral WebMVC module: opt-in JSON:API media negotiation. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
 | `docs` | Architecture and decision records. |
@@ -26,10 +28,9 @@ Dependencies resolve from Maven Central; the Plugin Portal also supplies build t
 Spring integration's core dependency boundary is released public neutral APIs, not
 core source or internal packages.
 
-The WebMVC module exposes `jsonapi-java-api:0.2.0` and Spring WebMVC as API dependencies.
-Production and test dependencies contain no Jackson runtime; architecture boundary tests
-arrive with the WebMVC implementation. Publication configuration and real consumer
-integration tests are separate work.
+The WebMVC module exposes `jsonapi-java-api:0.2.0`, Spring WebMVC, and the Servlet 6.1 API
+as API dependencies.
+Production and test dependencies contain no Jackson runtime.
 
 ## Compatibility
 
