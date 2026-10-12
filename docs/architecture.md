@@ -6,7 +6,8 @@ JSON:API semantics and runtimes; this repository owns Spring-specific integratio
 
 `jsonapi-java-spring-webmvc` owns JSON:API HTTP adaptation: it provides an opt-in
 `@JsonApiEndpoint` marker whose handlers get JSON:API 1.1 request and response media
-negotiation, without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record
+negotiation and operation-aware request/query context, without affecting ordinary Spring MVC
+endpoints. [ADRs](adr/README.md) record
 durable decisions.
 
 ## Repository structure
@@ -16,7 +17,7 @@ durable decisions.
 | `settings.gradle.kts` | Module membership and dependency repositories. |
 | Root build | Build/quality orchestration and Sonar configuration. |
 | `build-logic` | Reusable formatting and Java library quality conventions. |
-| `jsonapi-java-spring-webmvc` | Neutral WebMVC module: opt-in JSON:API media negotiation. |
+| `jsonapi-java-spring-webmvc` | Neutral WebMVC adapter: opt-in media negotiation and request/query context. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
 | `docs` | Architecture and decision records. |
@@ -28,9 +29,37 @@ Dependencies resolve from Maven Central; the Plugin Portal also supplies build t
 Spring integration's core dependency boundary is released public neutral APIs, not
 core source or internal packages.
 
-The WebMVC module exposes `jsonapi-java-api:0.2.0`, Spring WebMVC, and the Servlet 6.1 API
+The WebMVC module exposes `jsonapi-java-api:0.2.0`, `jsonapi-java-query:0.2.0`, Spring WebMVC, and the Servlet 6.1 API
 as API dependencies.
 Production and test dependencies contain no Jackson runtime.
+
+## Request boundary
+
+`@JsonApiEndpoint` stays in `com.kazforge.jsonapi.spring.webmvc`; media negotiation lives
+in `.media` and request context in `.request`. Both implementation packages are null-marked.
+
+Applications register `JsonApiMediaNegotiationInterceptor` before
+`JsonApiRequestContextInterceptor`, plus `JsonApiMediaNegotiationAdvice` as a bean and
+`JsonApiRequestContextArgumentResolver` through `WebMvcConfigurer#addArgumentResolvers`.
+Controllers can receive `JsonApiRequestContext`; later response handling can use its
+request-attribute accessor. No request-scoped runtime configuration or thread-local is used.
+
+Context carries the actual HTTP method, neutral `PrimaryDataContext`, and `JsonApiQuery`.
+The endpoint annotation defaults to `RESOURCE`; a method annotation replaces controller
+metadata, including defaults. Related-resource URLs are resource endpoints, whereas linkage
+URLs select `RELATIONSHIP`. Relationship POST/PATCH/DELETE must not be treated as resource
+create/update/delete solely from the verb. No body validation or binding occurs here.
+
+Only the raw servlet query string is passed to the public query parser, with an absent string
+treated as empty. The parser owns decoding, syntax, ordering, immutable snapshots, and diagnostic
+attribution. Servlet body/form parameters are not merged. Parsed query state is cached on the
+request by raw query input for redispatch; operation metadata is refreshed for each handler.
+Ordinary handlers clear the dispatch context. Representation selection is the query's existing
+neutral value, not a separate Spring model or effective authorization decision.
+
+Page/filter/custom values remain opaque. Applications own query execution, endpoint support
+policy, authorization, and route identity. Parser exceptions propagate unchanged; foundation
+protocol error rendering remains follow-up work, not a default error response in this slice.
 
 ## Compatibility
 

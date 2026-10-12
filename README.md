@@ -4,8 +4,9 @@ The separate Spring companion to [jsonapi-java](https://github.com/kazforge/json
 with its own repository and release train.
 
 The first module is `jsonapi-java-spring-webmvc`, a Jackson-major-neutral
-WebMVC module baseline targeting the public `JsonApi` contract, without runtime behavior
-or public integration APIs. Spring modules consume released jsonapi-java artifacts from
+WebMVC adapter providing opt-in JSON:API media negotiation and operation-aware request/query
+context through public neutral contracts. It does not bind DTOs or execute queries.
+Spring modules consume released jsonapi-java artifacts from
 Maven Central, not a sibling source checkout.
 
 ## Development
