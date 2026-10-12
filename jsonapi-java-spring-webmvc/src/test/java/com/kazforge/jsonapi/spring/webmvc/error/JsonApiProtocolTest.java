@@ -227,7 +227,10 @@ class JsonApiProtocolTest {
               }
 
               @Override
-              public void setWriteListener(jakarta.servlet.WriteListener listener) {}
+              public void setWriteListener(jakarta.servlet.WriteListener listener) {
+                throw new UnsupportedOperationException(
+                    "This fixture supports blocking writes only");
+              }
 
               @Override
               public void write(int value) throws IOException {
