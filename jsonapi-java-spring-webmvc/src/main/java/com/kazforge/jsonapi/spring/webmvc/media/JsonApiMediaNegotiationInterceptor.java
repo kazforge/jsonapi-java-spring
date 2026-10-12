@@ -8,6 +8,8 @@ import java.util.Collection;
 import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.StringUtils;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -27,21 +29,19 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
 
   @Override
-  public boolean preHandle(
-      HttpServletRequest request, HttpServletResponse response, Object handler) {
+  public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+      throws Exception {
     if (!isJsonApiHandler(handler)) {
       return true;
     }
     if (hasBody(request) && !hasValidContentType(request)) {
-      response.setStatus(HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE);
-      return false;
+      throw new HttpMediaTypeNotSupportedException("Unsupported JSON:API request media type");
     }
     String negotiated =
         JsonApiMediaNegotiation.negotiateContentType(request.getHeaders(HttpHeaders.ACCEPT));
     if (negotiated == null) {
       mergeVary(response);
-      response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
-      return false;
+      throw new HttpMediaTypeNotAcceptableException(List.of(JsonApiMediaNegotiation.JSON_API));
     }
     // Committing the negotiated type makes message conversion use it directly, so a malformed
     // alternative elsewhere in Accept cannot fail content negotiation downstream.

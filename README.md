@@ -5,7 +5,9 @@ with its own repository and release train.
 
 The first module is `jsonapi-java-spring-webmvc`, a Jackson-major-neutral
 WebMVC adapter providing opt-in JSON:API media negotiation and operation-aware request/query
-context through public neutral contracts. It does not bind DTOs or execute queries.
+context, safe protocol error responses, and explicit advanced document response transport
+through public neutral contracts. Applications supply their `JsonApi` runtime; the adapter
+does not bind DTOs, execute queries, or select application/domain error semantics.
 Spring modules consume released jsonapi-java artifacts from
 Maven Central, not a sibling source checkout.
 
