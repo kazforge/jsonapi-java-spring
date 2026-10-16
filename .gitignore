@@ -34,3 +34,4 @@ bin/
 .settings/
 .classpath
 .factorypath
+node_modules/
