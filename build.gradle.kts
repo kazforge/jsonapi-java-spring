@@ -1,5 +1,16 @@
+buildscript {
+    dependencies {
+        constraints {
+            classpath("com.fasterxml.jackson.core:jackson-core:2.22.3") {
+                because("CycloneDX tooling must not resolve vulnerable jackson-core 2.22.2")
+            }
+        }
+    }
+}
+
 plugins {
     base
+    alias(libs.plugins.cyclonedx) apply false
     alias(libs.plugins.sonarqube)
     id("jsonapi-java-spring-spotless")
 }

@@ -1,5 +1,14 @@
 plugins {
     id("jsonapi-java-spring-library")
+    alias(libs.plugins.cyclonedx)
+    id("jsonapi-java-spring-publish")
+}
+
+tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
+    includeConfigs = listOf("compileClasspath", "runtimeClasspath")
+    includeMetadataResolution = false
+    xmlOutput.unsetConvention()
+    jsonOutput.set(layout.buildDirectory.file("reports/release/bom.json"))
 }
 
 val springTestVersion = providers.gradleProperty("springTestVersion").getOrElse("minimum")

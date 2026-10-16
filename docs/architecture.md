@@ -20,6 +20,7 @@ without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record du
 | `examples/jackson3-webmvc` | Non-published application wiring and real Jackson 3 consumer smoke tests. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
+| `docs/release.md` | Independent versioning and signed Central publication. |
 | `docs` | Architecture and decision records. |
 
 ## Dependency boundary
@@ -108,6 +109,11 @@ Explicit Gradle dependencies, compilation, behavioral tests and existing CI veri
 No custom dependency or class-file scanners are used. The adapter exposes no Jackson-specific API.
 
 ## Compatibility
+
+Only WebMVC opts into the publication convention. The example remains unpublished;
+its Jackson dependencies never enter publication metadata or release SBOMs.
+[ADR 0006](adr/0006-independent-spring-release-lifecycle.md) records independent
+version semantics, signed publication and the explicit no-BOM decision.
 
 The supported Spring line is 7.0, with a 7.0.0 compatibility floor, Java 21 and Servlet 6.1.
 Use the current patched Spring release in applications; the floor describes API compatibility.
