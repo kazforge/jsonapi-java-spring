@@ -8,11 +8,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks a controller or handler method for JSON:API 1.1 media negotiation and operation-aware
- * request/query context.
+ * Marks a controller or handler method for JSON:API 1.1 media negotiation, operation-aware
+ * request/query context, and conventional resource DTO binding.
  *
- * <p>Apply to JSON:API controllers only. The negotiation interceptor ignores handlers without this
- * annotation, so ordinary Spring MVC endpoints remain unaffected.
+ * <p>Apply to JSON:API controllers only. Ordinary Spring MVC endpoints remain unaffected. Resource
+ * DTO binding is limited to resource endpoints; relationship handlers retain their own request and
+ * response handling.
  *
  * <p>Do not narrow {@code consumes} or {@code produces} on annotated mappings. Handler-mapping
  * {@code consumes}/{@code produces} checks run before the negotiation interceptor, so declaring

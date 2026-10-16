@@ -17,7 +17,12 @@ import java.io.*;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.http.converter.HttpMessageConversionException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.mock.web.*;
 import org.springframework.test.web.servlet.*;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -60,6 +65,8 @@ class JsonApiProtocolTest {
         .andExpect(header().string("Vary", "Accept"));
     ErrorObject error = runtime.error();
     assertEquals(code, error.code());
+    assertEquals("400", error.status());
+    assertEquals("Invalid query parameter", error.title());
     assertEquals(parameter, error.source() == null ? null : error.source().parameter());
     assertNull(error.detail());
   }
@@ -70,10 +77,16 @@ class JsonApiProtocolTest {
         .andExpect(status().isNotAcceptable())
         .andExpect(content().contentType("application/vnd.api+json"));
     assertEquals("Accept", Objects.requireNonNull(runtime.error().source()).header());
+    assertEquals("406", runtime.error().status());
+    assertEquals("NOT_ACCEPTABLE", runtime.error().code());
+    assertEquals("Not Acceptable", runtime.error().title());
     mvc.perform(
             post("/api").queryParam("sort", "").contentType("application/json").content("secret"))
         .andExpect(status().isUnsupportedMediaType());
     assertEquals("Content-Type", Objects.requireNonNull(runtime.error().source()).header());
+    assertEquals("415", runtime.error().status());
+    assertEquals("UNSUPPORTED_MEDIA_TYPE", runtime.error().code());
+    assertEquals("Unsupported Media Type", runtime.error().title());
   }
 
   @Test
@@ -112,6 +125,64 @@ class JsonApiProtocolTest {
                 com.kazforge.jsonapi.query.QueryDiagnostic.INVALID_SORT_SYNTAX, "sort", "secret")));
   }
 
+  @ParameterizedTest
+  @MethodSource("conversionFailures")
+  void conversionFailuresPreserveStatusCodeAndSafeTitle(
+      Exception failure, int status, String code, String title) throws Exception {
+    var response = new MockHttpServletResponse();
+    var handler = new HandlerMethod(new Controller(), "api", JsonApiRequestContext.class);
+    assertNotNull(
+        new JsonApiProtocolExceptionResolver(runtime)
+            .resolveException(new MockHttpServletRequest(), response, handler, failure));
+    ErrorObject error = runtime.error();
+    assertEquals(status, response.getStatus());
+    assertEquals(Integer.toString(status), error.status());
+    assertEquals(code, error.code());
+    assertEquals(title, error.title());
+    assertNull(error.detail());
+    assertNull(error.source());
+    assertEquals("application/vnd.api+json", response.getContentType());
+  }
+
+  static java.util.stream.Stream<Arguments> conversionFailures() {
+    var input =
+        new org.springframework.http.server.ServletServerHttpRequest(new MockHttpServletRequest());
+    var read =
+        new JsonApiDocumentReadException(
+            CodecFailureCategory.AGGREGATE_VALIDATION,
+            "/private",
+            SourceLocation.UNKNOWN,
+            "secret");
+    var mapping = new JsonApiMappingException(MappingDiagnostic.RESOURCE_TYPE_MISMATCH, "secret");
+    return java.util.stream.Stream.of(
+        Arguments.of(
+            new HttpMessageNotReadableException("secret", input),
+            400,
+            "INVALID_REQUEST_DOCUMENT",
+            "Invalid JSON:API resource document"),
+        Arguments.of(read, 400, "AGGREGATE_VALIDATION", "Invalid JSON:API document"),
+        Arguments.of(
+            new HttpMessageNotReadableException("secret", read, input),
+            400,
+            "AGGREGATE_VALIDATION",
+            "Invalid JSON:API document"),
+        Arguments.of(
+            new HttpMessageNotReadableException("secret", mapping, input),
+            400,
+            "RESOURCE_TYPE_MISMATCH",
+            "Invalid JSON:API resource document"),
+        Arguments.of(
+            new HttpMessageNotWritableException("secret"),
+            500,
+            "RESPONSE_SERIALIZATION_FAILED",
+            "Internal Server Error"),
+        Arguments.of(
+            new HttpMessageConversionException("secret"),
+            500,
+            "RESOURCE_BINDING_FAILED",
+            "Internal Server Error"));
+  }
+
   @Test
   void writerPreservesDocumentAndHandlesFailureWithoutRecursion() throws Exception {
     var writer = new JsonApiDocumentResponseWriter(runtime);
@@ -127,6 +198,8 @@ class JsonApiProtocolTest {
     writer.write(document, 200, response);
     assertEquals(500, response.getStatus());
     assertEquals("RESPONSE_SERIALIZATION_FAILED", runtime.error().code());
+    assertEquals("500", runtime.error().status());
+    assertEquals("Internal Server Error", runtime.error().title());
     runtime.failures = 2;
     writer.write(document, 200, response);
     assertEquals(0, response.getContentAsByteArray().length);

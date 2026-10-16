@@ -16,7 +16,7 @@ without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record du
 | `settings.gradle.kts` | Module membership and dependency repositories. |
 | Root build | Build/quality orchestration and Sonar configuration. |
 | `build-logic` | Reusable formatting and Java library quality conventions. |
-| `jsonapi-java-spring-webmvc` | Neutral WebMVC foundation: media negotiation, request/query context, protocol errors, and explicit document responses. |
+| `jsonapi-java-spring-webmvc` | Neutral WebMVC integration: media negotiation, request/query context, resource DTO binding, protocol errors, and explicit document responses. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
 | `docs` | Architecture and decision records. |
@@ -28,9 +28,8 @@ Dependencies resolve from Maven Central; the Plugin Portal also supplies build t
 Spring integration's core dependency boundary is released public neutral APIs, not
 core source or internal packages.
 
-The WebMVC module exposes `jsonapi-java-api:0.3.0`, `jsonapi-java-query:0.3.0`, Spring WebMVC, and the Servlet 6.1 API
-as API dependencies.
-Core 0.3.0 is the sole supported Core baseline.
+The WebMVC module exposes `jsonapi-java-api:0.4.0`, `jsonapi-java-query:0.4.0`, Spring WebMVC, and
+the Servlet 6.1 API as API dependencies. Core 0.4.0 is the sole supported Core baseline.
 Production and test dependencies contain no Jackson runtime.
 
 ## Request boundary
@@ -42,14 +41,28 @@ document response transport in `.document`. Production packages are null-marked.
 Applications register `JsonApiMediaNegotiationInterceptor` before
 `JsonApiRequestContextInterceptor`, plus `JsonApiMediaNegotiationAdvice` as a bean and
 `JsonApiRequestContextArgumentResolver` through `WebMvcConfigurer#addArgumentResolvers`.
-Controllers can receive `JsonApiRequestContext`; later response handling can use its
-request-attribute accessor. No request-scoped runtime configuration or thread-local is used.
+Resource DTO binding additionally registers one `JsonApiResourceHttpMessageConverter` with Spring
+7's `WebMvcConfigurer#configureMessageConverters(HttpMessageConverters.ServerBuilder)` using
+`addCustomConverter`, ahead of defaults. Standard Spring request-body/response-body processing,
+validation, and `ResponseEntity` handling remain in place. The converter checks the current servlet
+dispatch through Spring `RequestContextHolder` and then reads its request-attribute context; it
+keeps no mutable request state or library-owned thread-local. Controllers can receive
+`JsonApiRequestContext` as well.
 
 Context carries the actual HTTP method, neutral `PrimaryDataContext`, and `JsonApiQuery`.
 The endpoint annotation defaults to `RESOURCE`; a method annotation replaces controller
 metadata, including defaults. Related-resource URLs are resource endpoints, whereas linkage
 URLs select `RELATIONSHIP`. Relationship POST/PATCH/DELETE must not be treated as resource
-create/update/delete solely from the verb. No body validation or binding occurs here.
+create/update/delete solely from the verb.
+
+For a `RESOURCE` endpoint, POST request bodies bind once through the supplied runtime's
+`resources().readCreate`. DTO responses use `writeOne`; typed collections use `writeMany`, with
+the current request's representation selection passed per operation. `JsonApiResponse<T>` adds
+optional top-level meta, links, or an explicit JSON:API object without replacing the application
+value. Unwrapped responses remain ordinary resource documents. Relationship endpoints and ordinary
+unmarked handlers are not claimed. Applications retain ownership of persistence, query execution,
+authorization, route identity, and domain validation policy. Resource and collection values are
+non-null; plain null or bodyless returns remain Spring bodyless responses.
 
 Only the raw servlet query string is passed to the public query parser, with an absent string
 treated as empty. The parser owns decoding, syntax, ordering, immutable snapshots, and diagnostic
@@ -62,29 +75,30 @@ Page/filter/custom values remain opaque. Applications own query execution, endpo
 policy, authorization, and route identity. Parser exceptions retain their neutral diagnostics;
 the protocol resolver translates them without treating exception messages as public contracts.
 
-## Protocol errors and advanced document transport
+## Protocol errors and document transport
 
 Register `JsonApiProtocolExceptionResolver` with a caller-supplied `JsonApi` runtime before
 Spring's default exception resolvers; application handlers may precede it. It checks the selected
 handler's endpoint marker because request context may not exist when parsing fails. Negotiation
 uses Spring's typed media exceptions, retaining default status handling without this resolver.
 
-Query and neutral document-read failures produce 400 responses; negotiation produces 406/415.
-Errors reuse core `ErrorObject`, `ErrorSource`, and `JsonApiDocument` values with fixed titles
-and diagnostic codes. Decoded query parameter names and media header names are retained;
-exception details and unverified document pointers are omitted. Unrelated application,
-mapping and core-validation exceptions are not classified globally.
+Query, neutral document-read, known resource-input, and Spring validation failures produce 400
+responses; negotiation produces 406/415. Errors reuse core `ErrorObject`, `ErrorSource`, and
+`JsonApiDocument` values with fixed titles and diagnostic codes. Exception details and unverified
+document pointers are omitted. Unrelated mapping, configuration, and application exceptions are not
+classified as client errors.
 
 `JsonApiDocumentResponseWriter` accepts a neutral document, explicit HTTP status and servlet
-response for advanced use, not conventional DTO binding. Raw reads require an explicit
-`DocumentReadContext` through the runtime. Serialization delegates to `JsonApi.documents()`,
-preserving runtime defaults without a Spring-owned serializer or runtime discovery.
+response for advanced use. Raw reads require an explicit `DocumentReadContext` through the runtime.
+Serialization delegates to `JsonApi.documents()` for advanced documents and `JsonApi.resources()`
+for conventional DTOs, preserving runtime defaults without a Spring-owned serializer or runtime
+discovery.
 
-Serialization finishes before response mutation. Failures are logged and produce a generic
-500, or bodyless 500 if error serialization also fails. The writer resets uncommitted output
-mode while preserving headers, then emits UTF-8 bytes; committed output is untouched and I/O
-is not retried. Responses use bare `application/vnd.api+json` and merge `Vary: Accept`, even for
-406 errors. Application-error conveniences, validation mapping and DTO binding remain separate.
+Both response paths serialize fully before writing. The DTO converter skips committed responses and
+resets uncommitted output mode while restoring status and headers; the advanced writer likewise
+preserves headers. Failures are logged and produce a generic 500, or bodyless 500 if error
+serialization also fails. Transport I/O is not retried. Responses use bare
+`application/vnd.api+json` and merge `Vary: Accept`, even for 406 errors.
 
 Explicit Gradle dependencies, compilation, behavioral tests and existing CI verify this scope.
 No custom dependency or class-file scanners are used. The adapter exposes no Jackson-specific API.
