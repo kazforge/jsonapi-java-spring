@@ -17,6 +17,7 @@ without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record du
 | Root build | Build/quality orchestration and Sonar configuration. |
 | `build-logic` | Reusable formatting and Java library quality conventions. |
 | `jsonapi-java-spring-webmvc` | Neutral WebMVC integration: media negotiation, request/query context, resource DTO binding, protocol errors, and explicit document responses. |
+| `examples/jackson3-webmvc` | Non-published application wiring and real Jackson 3 consumer smoke tests. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
 | `docs` | Architecture and decision records. |
@@ -30,7 +31,10 @@ core source or internal packages.
 
 The WebMVC module exposes `jsonapi-java-api:0.4.0`, `jsonapi-java-query:0.4.0`, Spring WebMVC, and
 the Servlet 6.1 API as API dependencies. Core 0.4.0 is the sole supported Core baseline.
-Production and test dependencies contain no Jackson runtime.
+The adapter's production and test dependencies contain no Jackson runtime. The separate
+non-published consumer example depends on `jsonapi-java-jackson3:0.4.0` from Maven Central
+and the local Spring adapter. Jackson-specific construction belongs to that application,
+which supplies the neutral `JsonApi` bean. No source substitution or local Core build is used.
 
 ## Request boundary
 
@@ -110,3 +114,8 @@ Use the current patched Spring release in applications; the floor describes API 
 Production compilation stays at the floor. Standard tests select minimum or current stable
 7.0 (initially 7.0.9) with `springTestVersion`; both run in the CI matrix. Current versions
 are test-only. Spring 6.2 and Spring 7.1 milestones are not supported targets.
+
+The consumer example separately uses the catalog's current Spring patch for both compilation
+and tests. CI's minimum leg runs the full build, including that fixed-current consumer;
+the current leg runs only the adapter build. This avoids multiplying consumer tests by
+the adapter's compatibility dimension. The root build still runs all modules locally.

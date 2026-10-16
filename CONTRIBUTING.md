@@ -38,6 +38,12 @@ WebMVC production compilation and default tests use Spring 7.0.0. Run
 run in the CI matrix; only minimum runs Sonar. Production dependencies remain at the floor.
 Minimum version changes require a maintainer decision; current-test patches may be automated.
 
+The non-published `examples/jackson3-webmvc` module reuses library quality conventions,
+including the unchanged coverage thresholds, but supplies application-owned Jackson 3
+wiring. It always uses the current Spring BOM, independently of `springTestVersion`.
+CI's minimum leg runs the full root build (including this consumer); its current leg
+runs `:jsonapi-java-spring-webmvc:build -PspringTestVersion=current` only.
+
 ## Repository documentation
 
 Update [architecture](docs/architecture.md) in the same PR when changing repository

@@ -26,6 +26,7 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit" }
 jsonapi-api = { module = "com.kazforge:jsonapi-java-api", version.ref = "jsonapi" }
 jsonapi-query = { module = "com.kazforge:jsonapi-java-query", version.ref = "jsonapi" }
+jsonapi-jackson3 = { module = "com.kazforge:jsonapi-java-jackson3", version.ref = "jsonapi" }
 servlet-api = { module = "jakarta.servlet:jakarta.servlet-api", version = "6.1.0" }
 spring-webmvc = { module = "org.springframework:spring-webmvc", version.ref = "spring-minimum" }
 spring-test = { module = "org.springframework:spring-test", version.ref = "spring-minimum" }

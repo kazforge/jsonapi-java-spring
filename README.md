@@ -31,4 +31,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the module quality policy.
 
 See [repository architecture and decisions](docs/README.md).
 
+The [Jackson 3 WebMVC consumer example](examples/jackson3-webmvc/README.md) demonstrates
+explicit application wiring and real-runtime HTTP integration against published Core 0.4.0.
+See [release readiness](docs/release.md) for the verified baseline and release boundary.
+
 Licensed under [Apache-2.0](LICENSE).
