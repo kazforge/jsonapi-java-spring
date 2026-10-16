@@ -5,6 +5,7 @@ import com.kazforge.jsonapi.core.model.ErrorObject;
 import com.kazforge.jsonapi.core.model.ErrorSource;
 import com.kazforge.jsonapi.core.model.JsonApiDocument;
 import com.kazforge.jsonapi.diagnostic.JsonApiDocumentReadException;
+import com.kazforge.jsonapi.diagnostic.JsonApiMappingException;
 import com.kazforge.jsonapi.query.JsonApiQueryException;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
 import com.kazforge.jsonapi.spring.webmvc.document.JsonApiDocumentResponseWriter;
@@ -13,8 +14,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
+import org.springframework.http.converter.HttpMessageConversionException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.ModelAndView;
@@ -63,38 +68,79 @@ public final class JsonApiProtocolExceptionResolver implements HandlerExceptionR
   }
 
   private static @Nullable ErrorObject translate(Exception exception) {
-    if (exception instanceof JsonApiQueryException query) {
-      String parameterName = query.parameterName();
-      return ErrorObject.builder()
-          .status("400")
-          .code(query.diagnostic().name())
-          .title("Invalid query parameter")
-          .source(parameterName == null ? null : ErrorSource.ofParameter(parameterName))
-          .build();
-    }
-    if (exception instanceof JsonApiDocumentReadException read) {
-      return ErrorObject.builder()
-          .status("400")
-          .code(read.category().name())
-          .title("Invalid JSON:API document")
-          .build();
-    }
-    if (exception instanceof HttpMediaTypeNotAcceptableException) {
-      return ErrorObject.builder()
-          .status("406")
-          .code("NOT_ACCEPTABLE")
-          .title("Not Acceptable")
-          .source(ErrorSource.builder().header("Accept").build())
-          .build();
-    }
-    if (exception instanceof HttpMediaTypeNotSupportedException) {
-      return ErrorObject.builder()
-          .status("415")
-          .code("UNSUPPORTED_MEDIA_TYPE")
-          .title("Unsupported Media Type")
-          .source(ErrorSource.builder().header("Content-Type").build())
-          .build();
-    }
-    return null;
+    return switch (exception) {
+      case JsonApiQueryException query -> {
+        String parameterName = query.parameterName();
+        yield ErrorObject.builder()
+            .status("400")
+            .code(query.diagnostic().name())
+            .title("Invalid query parameter")
+            .source(parameterName == null ? null : ErrorSource.ofParameter(parameterName))
+            .build();
+      }
+      case JsonApiDocumentReadException read ->
+          ErrorObject.builder()
+              .status("400")
+              .code(read.category().name())
+              .title("Invalid JSON:API document")
+              .build();
+      case HttpMessageNotReadableException read -> {
+        if (read.getCause() instanceof JsonApiDocumentReadException documentRead) {
+          yield ErrorObject.builder()
+              .status("400")
+              .code(documentRead.category().name())
+              .title("Invalid JSON:API document")
+              .build();
+        }
+        if (read.getCause() instanceof JsonApiMappingException mapping) {
+          yield ErrorObject.builder()
+              .status("400")
+              .code(mapping.diagnostic().name())
+              .title("Invalid JSON:API resource document")
+              .build();
+        }
+        yield ErrorObject.builder()
+            .status("400")
+            .code("INVALID_REQUEST_DOCUMENT")
+            .title("Invalid JSON:API resource document")
+            .build();
+      }
+      case MethodArgumentNotValidException ignored ->
+          ErrorObject.builder()
+              .status("400")
+              .code("INVALID_REQUEST")
+              .title("Invalid request")
+              .build();
+      case HttpMessageNotWritableException ignored ->
+          ErrorObject.builder()
+              .status("500")
+              .code("RESPONSE_SERIALIZATION_FAILED")
+              .title("Internal Server Error")
+              .build();
+      case HttpMessageConversionException ignored -> resourceBindingFailure();
+      case HttpMediaTypeNotAcceptableException ignored ->
+          ErrorObject.builder()
+              .status("406")
+              .code("NOT_ACCEPTABLE")
+              .title("Not Acceptable")
+              .source(ErrorSource.builder().header("Accept").build())
+              .build();
+      case HttpMediaTypeNotSupportedException ignored ->
+          ErrorObject.builder()
+              .status("415")
+              .code("UNSUPPORTED_MEDIA_TYPE")
+              .title("Unsupported Media Type")
+              .source(ErrorSource.builder().header("Content-Type").build())
+              .build();
+      default -> null;
+    };
+  }
+
+  private static ErrorObject resourceBindingFailure() {
+    return ErrorObject.builder()
+        .status("500")
+        .code("RESOURCE_BINDING_FAILED")
+        .title("Internal Server Error")
+        .build();
   }
 }

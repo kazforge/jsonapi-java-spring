@@ -3,11 +3,16 @@
 The separate Spring companion to [jsonapi-java](https://github.com/kazforge/jsonapi-java),
 with its own repository and release train.
 
-The first module is `jsonapi-java-spring-webmvc`, a Jackson-neutral
-WebMVC adapter providing opt-in JSON:API media negotiation and operation-aware request/query
-context, safe protocol error responses, and explicit advanced document response transport
-through public neutral contracts. Applications supply their `JsonApi` runtime; the adapter
-does not bind DTOs, execute queries, or select application/domain error semantics.
+The first module is `jsonapi-java-spring-webmvc`, a Jackson-neutral WebMVC adapter providing
+opt-in JSON:API media negotiation, operation-aware request/query context, safe protocol errors,
+and conventional resource DTO binding through public neutral contracts. Applications supply their
+`JsonApi` runtime; the adapter does not execute queries or select application/domain error
+semantics.
+The adapter targets Core 0.4.0. Configure `JsonApiResourceHttpMessageConverter` through Spring 7's
+`WebMvcConfigurer#configureMessageConverters(HttpMessageConverters.ServerBuilder)` to bind resource
+POST bodies and serialize DTOs; `JsonApiResponse<T>` adds optional top-level metadata, links, or a
+JSON:API object. The converter uses the request's opted-in resource context and leaves relationship and
+ordinary MVC handlers alone.
 Spring modules consume released jsonapi-java artifacts from
 Maven Central, not a sibling source checkout.
 
