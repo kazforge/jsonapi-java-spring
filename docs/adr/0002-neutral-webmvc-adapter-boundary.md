@@ -6,8 +6,8 @@ Date: 2026-10-11
 
 ## Context
 
-Core exposes a public backend-neutral `JsonApi` contract implemented by Jackson 2
-and Jackson 3 runtimes. Spring HTTP integration does not need to own JSON processing
+Core exposes a public backend-neutral `JsonApi` contract implemented by its Jackson 3
+runtime. Spring HTTP integration does not need to own JSON processing
 or select the application's runtime.
 
 ## Decision
@@ -18,6 +18,6 @@ owns JSON:API semantics. Its direct framework contract is Spring Framework, not 
 
 ## Consequences
 
-Applications choose and configure their Jackson runtime. The adapter couples to public
-neutral core contracts rather than a Jackson implementation, allowing the same adapter
-to serve either major without duplicating core behavior or requiring Boot.
+Applications construct and configure the supported Jackson 3 runtime. The adapter couples
+to public neutral Core contracts rather than a Jackson implementation, without duplicating
+Core behavior or requiring Boot. The neutral boundary is not a promise of Jackson 2 support.

@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "jsonapi-java-spring"
 include("jsonapi-java-spring-webmvc")
+include("examples:jackson3-webmvc")
