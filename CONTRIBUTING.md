@@ -30,7 +30,9 @@ this also exempts it from the missing-data guard. There are no exemptions initia
 
 Normal dependencies resolve only from Maven Central. Do not introduce `mavenLocal()`,
 local jsonapi-java composites, or source substitution. The Plugin Portal is used only
-to resolve build tooling. Publication/signing and consumer verification are separate work.
+to resolve build tooling. Publication/signing is opt-in through
+`jsonapi-java-spring-publish`; never apply it to application examples. See
+[release lifecycle](docs/release.md) for credentials and maintainer verification.
 
 WebMVC production compilation and default tests use Spring 7.0.0. Run
 `./gradlew clean build -PspringTestVersion=current` to select the catalog's current stable
@@ -71,7 +73,8 @@ scoped to the trusted Sonar steps, not the normal build. No privileged PR follow
 workflow is introduced. Normal
 `./gradlew clean build` never runs Sonar or needs a token; formatting, compiler/nullness,
 tests, and JaCoCo's 80/80 verification remain authoritative. Jackson-specific CPD/source
-exclusions, CycloneDX, publication/signing, and unrelated security tooling are not copied.
+exclusions and unrelated security tooling are not copied. CycloneDX and publication/signing
+apply only to the published WebMVC module, not to the shared quality convention.
 Modules with executable production code supply coverage reports through the library convention.
 
 Files use UTF-8 and LF, except Windows `.bat`/`.cmd` scripts use CRLF. Keep the wrapper

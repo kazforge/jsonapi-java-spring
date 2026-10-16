@@ -30,6 +30,14 @@ jobs:
       - name: Build and verify
         if: matrix.spring-test-version == 'minimum'
         run: ./gradlew clean spotlessCheck build
+      - name: Verify publication contract without secrets
+        if: matrix.spring-test-version == 'minimum'
+        run: |
+          bash .github/scripts/test-central-publication.sh
+          ./gradlew :jsonapi-java-spring-webmvc:cyclonedxDirectBom :jsonapi-java-spring-webmvc:generatePomFileForMavenJavaPublication :jsonapi-java-spring-webmvc:generateMetadataFileForMavenJavaPublication
+          python3 .github/scripts/verify-publication.py
+          ./gradlew :jsonapi-java-spring-webmvc:generatePomFileForMavenJavaPublication :jsonapi-java-spring-webmvc:generateMetadataFileForMavenJavaPublication -PspringTestVersion=current
+          python3 .github/scripts/verify-publication.py
       - name: Verify current Spring adapter compatibility
         if: matrix.spring-test-version == 'current'
         run: ./gradlew :jsonapi-java-spring-webmvc:clean :jsonapi-java-spring-webmvc:build -PspringTestVersion=current
