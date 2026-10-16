@@ -3,7 +3,7 @@
 The separate Spring companion to [jsonapi-java](https://github.com/kazforge/jsonapi-java),
 with its own repository and release train.
 
-The first module is `jsonapi-java-spring-webmvc`, a Jackson-major-neutral
+The first module is `jsonapi-java-spring-webmvc`, a Jackson-neutral
 WebMVC adapter providing opt-in JSON:API media negotiation and operation-aware request/query
 context, safe protocol error responses, and explicit advanced document response transport
 through public neutral contracts. Applications supply their `JsonApi` runtime; the adapter
