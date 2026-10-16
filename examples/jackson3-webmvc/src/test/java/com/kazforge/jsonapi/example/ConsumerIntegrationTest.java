@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.core.SpringVersion;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.test.web.servlet.MockMvc;
@@ -58,8 +60,15 @@ class ConsumerIntegrationTest {
     assertEquals("Created without ID", body.at("/data/attributes/title").asString());
   }
 
-  @Test
-  void preservesAnApplicationSuppliedId() throws Exception {
+  @ParameterizedTest
+  @CsvSource({
+    "7, /articles/7",
+    "draft#1, /articles/draft%231",
+    "draft 1, /articles/draft%201",
+    "draft/1, /articles/draft%2F1",
+    "draft%1, /articles/draft%251"
+  })
+  void preservesSuppliedIdsAndEncodesLocationSegments(String id, String location) throws Exception {
     JsonNode body =
         body(
             mvc.perform(
@@ -68,12 +77,13 @@ class ConsumerIntegrationTest {
                         .accept(JSON_API)
                         .content(
                             """
-            {"data":{"type":"articles","id":"7","attributes":{"title":"Client ID"}}}
-            """))
+            {"data":{"type":"articles","id":"%s","attributes":{"title":"Client ID"}}}
+            """
+                                .formatted(id)))
                 .andExpect(status().isCreated())
-                .andExpect(header().string("Location", "/articles/7"))
+                .andExpect(header().string("Location", location))
                 .andReturn());
-    assertEquals("7", body.at("/data/id").asString());
+    assertEquals(id, body.at("/data/id").asString());
     assertEquals("Client ID", body.at("/data/attributes/title").asString());
   }
 
