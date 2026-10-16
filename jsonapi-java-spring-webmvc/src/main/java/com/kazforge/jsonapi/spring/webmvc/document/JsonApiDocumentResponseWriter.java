@@ -1,8 +1,8 @@
 package com.kazforge.jsonapi.spring.webmvc.document;
 
 import com.kazforge.jsonapi.api.JsonApi;
-import com.kazforge.jsonapi.core.model.ErrorObject;
 import com.kazforge.jsonapi.core.model.JsonApiDocument;
+import com.kazforge.jsonapi.spring.webmvc.internal.ProtocolError;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -47,16 +47,11 @@ public final class JsonApiDocumentResponseWriter {
       body = serialize(document);
     } catch (RuntimeException failure) {
       LOGGER.log(System.Logger.Level.WARNING, "JSON:API response serialization failed", failure);
-      selectedStatus = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+      selectedStatus = ProtocolError.RESPONSE_SERIALIZATION_FAILED.status().value();
       try {
         body =
             serialize(
-                JsonApiDocument.withError(
-                    ErrorObject.builder()
-                        .status("500")
-                        .code("RESPONSE_SERIALIZATION_FAILED")
-                        .title("Internal Server Error")
-                        .build()));
+                JsonApiDocument.withError(ProtocolError.RESPONSE_SERIALIZATION_FAILED.error()));
       } catch (RuntimeException errorFailure) {
         LOGGER.log(
             System.Logger.Level.WARNING, "JSON:API error serialization failed", errorFailure);

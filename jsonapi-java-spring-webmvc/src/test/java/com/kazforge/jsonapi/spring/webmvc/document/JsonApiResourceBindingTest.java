@@ -179,7 +179,7 @@ class JsonApiResourceBindingTest {
   }
 
   @Test
-  void writesSingletonListsEmptyListAndEntityHeadersThroughActualMvcConverter() throws Exception {
+  void writesSingletonAndCollectionValuesThroughActualMvcConverter() throws Exception {
     mvc.perform(get("/one").accept("application/vnd.api+json").queryParam("include", "author"))
         .andExpect(status().isOk())
         .andExpect(content().string("resource-document"));
@@ -198,7 +198,10 @@ class JsonApiResourceBindingTest {
     mvc.perform(get("/empty").accept("application/vnd.api+json")).andExpect(status().isOk());
     assertEquals("writeMany", runtime.writes.getLast());
     assertEquals(List.of(), runtime.writtenValues.getLast());
+  }
 
+  @Test
+  void rawStringAndByteResponsesBypassResourceSerialization() throws Exception {
     int resourceWrites = runtime.writes.size();
     mvc.perform(get("/plain-string").accept("application/vnd.api+json"))
         .andExpect(status().isOk())
@@ -207,7 +210,10 @@ class JsonApiResourceBindingTest {
         .andExpect(status().isOk())
         .andExpect(content().bytes("bytes".getBytes(StandardCharsets.UTF_8)));
     assertEquals(resourceWrites, runtime.writes.size());
+  }
 
+  @Test
+  void responseEntitiesPreserveHeadersAndUnwrapResourceEnvelopes() throws Exception {
     mvc.perform(get("/entity").accept("application/vnd.api+json"))
         .andExpect(status().isCreated())
         .andExpect(header().string("Location", "/resources/7"))
@@ -230,7 +236,10 @@ class JsonApiResourceBindingTest {
             .members()
             .get("source"));
     assertEquals(JsonApiObject.ofVersion("1.1"), runtime.options.getLast().envelope().jsonapi());
+  }
 
+  @Test
+  void paginationEnvelopeLeavesRuntimeDefaultsIntact() throws Exception {
     mvc.perform(get("/page").accept("application/vnd.api+json")).andExpect(status().isOk());
     assertEquals(
         "7",
@@ -242,7 +251,10 @@ class JsonApiResourceBindingTest {
     assertTrue(pageLinks.links().containsKey("self"));
     assertTrue(pageLinks.links().containsKey("next"));
     assertNull(runtime.options.getLast().envelope().jsonapi());
+  }
 
+  @Test
+  void resourceWritesResetUncommittedOutputAndSkipCommittedResponses() throws Exception {
     mvc.perform(get("/writer-selected").accept("application/vnd.api+json"))
         .andExpect(status().isOk())
         .andExpect(content().string("resource-document"))
@@ -299,7 +311,7 @@ class JsonApiResourceBindingTest {
     assertEquals(6, OrdinaryConverter.writeCalls);
     assertEquals(
         List.of("ordinary", "ordinary", "ordinary", "ordinary", "ordinary", "ordinary"),
-        OrdinaryConverter.writtenValues);
+        List.copyOf(OrdinaryConverter.writtenValues));
     assertEquals(resourceReads, runtime.reads);
     assertEquals(resourceWrites, runtime.writes.size());
 
