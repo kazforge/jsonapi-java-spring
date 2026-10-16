@@ -20,7 +20,7 @@ without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record du
 | `examples/jackson3-webmvc` | Non-published application wiring and real Jackson 3 consumer smoke tests. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
-| `docs/release.md` | Independent versioning, signed Central publication and validation rehearsals. |
+| `docs/release.md` | Independent versioning and signed Central publication. |
 | `docs` | Architecture and decision records. |
 
 ## Dependency boundary

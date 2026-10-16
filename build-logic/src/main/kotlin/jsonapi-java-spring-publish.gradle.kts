@@ -54,7 +54,7 @@ publishing {
 
 signing {
     val key = providers.gradleProperty("signingKey")
-    isRequired = providers.gradleProperty("release").isPresent || key.isPresent
+    isRequired = key.isPresent
     if (key.isPresent) {
         useInMemoryPgpKeys(key.get(), providers.gradleProperty("signingPassword").orElse("").get())
     }

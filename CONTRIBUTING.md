@@ -32,7 +32,7 @@ Normal dependencies resolve only from Maven Central. Do not introduce `mavenLoca
 local jsonapi-java composites, or source substitution. The Plugin Portal is used only
 to resolve build tooling. Publication/signing is opt-in through
 `jsonapi-java-spring-publish`; never apply it to application examples. See
-[release lifecycle](docs/release.md) for credentials and maintainer verification.
+[release lifecycle](docs/release.md) for the release flow and recovery notes.
 
 WebMVC production compilation and default tests use Spring 7.0.0. Run
 `./gradlew clean build -PspringTestVersion=current` to select the catalog's current stable
