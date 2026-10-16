@@ -10,6 +10,15 @@ wrapper rather than a system Gradle installation.
 
 For a deliberately cache-free final verification, append `--no-build-cache`.
 
+## Commit messages
+
+PR titles and commits must use Conventional Commits: `type(scope): description`
+(scope optional), for example `feat(webmvc): support sparse fieldsets`,
+`fix: reject invalid queries`, or `chore: update tooling`. Mark breaking changes
+with `!` before the colon or a `BREAKING CHANGE:` footer. CI checks both the title
+and commit range so squash and rebase merges remain supported. See
+[ADR 0006](docs/adr/0006-independent-spring-release-lifecycle.md) for release semantics.
+
 ## Build conventions
 
 `settings.gradle.kts` owns module membership. The root has no production sources.
