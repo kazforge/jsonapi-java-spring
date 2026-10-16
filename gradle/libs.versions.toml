@@ -8,7 +8,7 @@ nullaway-plugin = "3.3.0"
 junit = "6.1.3"
 jacoco = "0.8.15"
 sonarqube = "7.5.0.8588"
-jsonapi = "0.2.0"
+jsonapi = "0.3.0"
 # Consumer compatibility floor; changes require a maintainer decision.
 spring-minimum = "7.0.0"
 # Test-only forward compatibility target.
