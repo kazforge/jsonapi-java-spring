@@ -1,22 +1,30 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
   ],
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
-      "matchDepNames": ["java-jdk"],
+      "matchDatasources": ["java-version"],
+      "matchPackageNames": ["java", "java-jdk", "java-jre"],
       "enabled": false
     },
     {
       "matchManagers": ["gradle"],
-      "matchDepNames": ["org.springframework:spring-webmvc", "org.springframework:spring-test"],
+      "matchPackageNames": ["org.springframework:spring-webmvc", "org.springframework:spring-test"],
+      "enabled": false
+    },
+    {
+      "description": "Published Core dependencies are an intentional consumer compatibility floor.",
+      "matchManagers": ["gradle"],
+      "matchPackageNames": ["com.kazforge:jsonapi-java-api", "com.kazforge:jsonapi-java-query", "com.kazforge:jsonapi-java-jackson3"],
       "enabled": false
     },
     {
       "matchManagers": ["gradle"],
-      "matchDepNames": ["org.springframework:spring-framework-bom"],
+      "matchPackageNames": ["org.springframework:spring-framework-bom"],
       "allowedVersions": "/^7\\.0\\.\\d+$/"
     }
   ]
