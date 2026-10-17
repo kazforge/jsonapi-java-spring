@@ -43,7 +43,7 @@ to resolve build tooling. Publication/signing is opt-in through
 `jsonapi-java-spring-publish`; never apply it to application examples. See
 [release lifecycle](docs/release.md) for the release flow and recovery notes.
 
-WebMVC production compilation and default tests use Spring 7.0.0. Run
+WebMVC production compilation, published API dependency and default tests use Spring 7.0.9. Run
 `./gradlew clean build -PspringTestVersion=current` to select the catalog's current stable
 7.0 patch for tests only. The default is `minimum`; other values are rejected. Both paths
 run in the CI matrix; only minimum runs Sonar. Production dependencies remain at the floor.
