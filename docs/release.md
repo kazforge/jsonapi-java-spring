@@ -17,6 +17,9 @@ Only `com.kazforge:jsonapi-java-spring-webmvc` is published, with sources, Javad
 POM, Gradle metadata and a signed `cyclonedx.json` classifier. The SBOM covers production
 dependencies, not tests or the unpublished Jackson 3 example. The adapter stays
 Jackson-neutral and consumes published Core API/query 0.4.0; Spring's version is independent.
+The first release requires Spring Framework 7.0.9 or later in the supported 7.0.x line,
+both as the supported minimum and the declared WebMVC API dependency. See
+[compatibility](architecture.md#compatibility) for the minimum/current test policy.
 
 Before announcing availability, verify Central publication, signatures and GitHub
 attestations, then test a clean external consumer. A GitHub Release or successful

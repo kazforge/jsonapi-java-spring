@@ -115,11 +115,13 @@ its Jackson dependencies never enter publication metadata or release SBOMs.
 [ADR 0006](adr/0006-independent-spring-release-lifecycle.md) records independent
 version semantics, signed publication and the explicit no-BOM decision.
 
-The supported Spring line is 7.0, with a 7.0.0 compatibility floor, Java 21 and Servlet 6.1.
-Use the current patched Spring release in applications; the floor describes API compatibility.
-Production compilation stays at the floor. Standard tests select minimum or current stable
-7.0 (initially 7.0.9) with `springTestVersion`; both run in the CI matrix. Current versions
-are test-only. Spring 6.2 and Spring 7.1 milestones are not supported targets.
+The supported Spring line is 7.0, with a 7.0.9 minimum, Java 21 and Servlet 6.1.
+Production compilation and the published WebMVC API dependency use this same minimum.
+Applications should use the latest patched 7.0.x release; the supported minimum is not a
+promise of ongoing security fixes. Standard tests select minimum or current stable 7.0
+with `springTestVersion`; both run in the CI matrix and initially resolve to 7.0.9.
+Only the current test target advances with newer supported patches; it does not raise the
+published dependency baseline. Spring 6.2 and Spring 7.1 milestones are not supported targets.
 
 The consumer example separately uses the catalog's current Spring patch for both compilation
 and tests. CI's minimum leg runs the full build, including that fixed-current consumer;

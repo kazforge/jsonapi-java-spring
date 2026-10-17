@@ -36,5 +36,6 @@ request context/interceptor/argument resolver, protocol resolver, and explicit d
 Applications register these seams explicitly and choose/configure their neutral runtime.
 Runtime document defaults are preserved by delegation. Rely on explicit neutral Gradle dependencies,
 compilation, behavioral tests and existing CI rather than custom boundary scanners or extra build
-infrastructure. Spring 7.0.0 minimum, current-test 7.0.9, Java 21 and Servlet 6.1 remain unchanged.
+infrastructure. The Spring compatibility policy remains in ADR 0003; Java 21 and Servlet 6.1
+remain unchanged.
 This extends ADRs 0002 and 0004 without changing their request semantics.
