@@ -35,4 +35,6 @@ The [Jackson 3 WebMVC consumer example](examples/jackson3-webmvc/README.md) demo
 explicit application wiring and real-runtime HTTP integration against published Core 0.4.0.
 See [release readiness](docs/release.md) for the verified baseline and release boundary.
 
+See the [security policy](docs/security.md) for vulnerability triage and merge protection.
+
 Licensed under [Apache-2.0](LICENSE).
