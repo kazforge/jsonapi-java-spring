@@ -29,6 +29,8 @@ Install JDK 21 and use the committed wrapper:
 `build` includes formatting checks and validation of the reusable build conventions.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the module quality policy.
 
+The [release-owned Spring WebMVC guide](docs/site/index.md) covers consumer compatibility and setup. It is published to the shared portal from the verified software release tag, not from `main`.
+
 See [repository architecture and decisions](docs/README.md).
 
 The [Jackson 3 WebMVC consumer example](examples/jackson3-webmvc/README.md) demonstrates
