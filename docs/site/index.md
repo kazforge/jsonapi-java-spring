@@ -14,15 +14,15 @@ This is a companion to the framework-neutral
 **independent release trains**. Your application still owns controllers,
 persistence, authorization and query execution.
 
-## Spring 0.1.0 compatibility
+## Compatibility
 
 | Requirement | Verified baseline |
 | --- | --- |
 | Java | 21+ |
 | Spring Framework | 7.0.x; minimum **7.0.9** |
 | Servlet API | Jakarta Servlet 6.1 |
-| jsonapi-java neutral API/query | **0.4.0** |
-| Consumer runtime | Jackson 3 through `jsonapi-java-jackson3:0.4.0` |
+| jsonapi-java API/query | **0.4.0**, included transitively |
+| Consumer runtime | Jackson 3, application-supplied |
 
 The **Spring adapter is Jackson-neutral**. Applications supply a neutral
 `JsonApi` runtime; the verified consumer example constructs it with Jackson 3.
@@ -32,19 +32,32 @@ promise of future security updates.
 
 ## Dependencies
 
-For the first Spring **0.1.0** release, add the WebMVC companion and the
-application's Jackson 3 runtime from Maven Central:
+Add the released WebMVC companion from Maven Central:
+
+<!-- x-release-please-start-version -->
 
 ```kotlin
 dependencies {
     implementation("com.kazforge:jsonapi-java-spring-webmvc:0.1.0")
-    implementation("com.kazforge:jsonapi-java-jackson3:0.4.0")
 }
 ```
 
-The WebMVC artifact exposes the neutral Core API/query dependencies and Spring
-WebMVC; the Jackson 3 runtime is **application-owned**. No separate Spring BOM
-or Boot starter is published.
+<!-- x-release-please-end -->
+
+WebMVC brings the neutral Core API and query libraries **transitively**;
+do not add them again. It deliberately does **not** include a JSON runtime.
+For the verified Jackson 3 setup, also add this line to your
+`dependencies` block:
+
+```kotlin
+implementation("com.kazforge:jsonapi-java-jackson3:0.4.0")
+```
+
+The Jackson 3 version matches the verified Core **0.4.0** baseline above.
+Change it only when this Spring release's Core compatibility baseline changes;
+Spring and Core are independently versioned. See the
+[Core getting-started guide](https://jsonapi.kazforge.com/getting-started/)
+for the neutral runtime setup. No separate Spring BOM or Boot starter is published.
 
 The versioned guide is promoted to the public portal only **after** the Spring
 software release has been published to Maven Central and verified from a clean
