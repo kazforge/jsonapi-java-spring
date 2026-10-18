@@ -7,7 +7,7 @@ description: Wire jsonapi-java-spring-webmvc into an existing Spring MVC applica
 
 Use an existing Spring Framework 7 Servlet-based MVC application. The companion
 does not create a server or supply Spring Boot auto-configuration. Start with
-the [Spring 0.1.0 dependencies](index.md#dependencies).
+the [Spring dependencies](index.md#dependencies).
 
 ## Register the adapter
 
@@ -36,8 +36,8 @@ integration hooks:
 5. Expose `JsonApiMediaNegotiationAdvice` as a Spring bean.
 
 Here, `runtime` is the injected, application-supplied `JsonApi` bean.
-The [complete WebMVC configuration](https://github.com/kazforge/jsonapi-java-spring/blob/v0.1.0/examples/jackson3-webmvc/src/main/java/com/kazforge/jsonapi/example/ConsumerConfiguration.java)
-is the verified source for exact imports and registration code.
+The real example's `ConsumerConfiguration` is the verified source for
+exact imports and registration code.
 
 ## Opt in per controller
 
@@ -45,9 +45,8 @@ Annotate JSON:API controllers or methods with `@JsonApiEndpoint`. Do **not**
 set `consumes` or `produces` on their request mappings: Spring evaluates
 those mapping conditions before the adapter's JSON:API media negotiation.
 
-The [example controller](https://github.com/kazforge/jsonapi-java-spring/blob/v0.1.0/examples/jackson3-webmvc/src/main/java/com/kazforge/jsonapi/example/ArticleController.java)
-uses normal `@RequestBody` DTOs, `ResponseEntity` and `List<Article>`
-responses. For example, its POST handler accepts:
+The example's `ArticleController` uses normal `@RequestBody` DTOs,
+`ResponseEntity` and `List<Article>` responses. Its POST handler accepts:
 
 ```http
 POST /articles
@@ -64,7 +63,14 @@ The adapter handles JSON:API media negotiation and known protocol/input errors;
 it does not execute queries or automatically manage relationships. Unannotated
 Spring MVC handlers keep their ordinary behavior.
 
-See the [tested Jackson 3 consumer](https://github.com/kazforge/jsonapi-java-spring/tree/v0.1.0/examples/jackson3-webmvc)
-for the complete wiring and MockMvc scenarios. For resource annotations, PATCH,
-relationships and query semantics, use the
+The complete wiring and MockMvc scenarios are available in the
+release-matched example:
+
+<!-- x-release-please-start-version -->
+
+[Tested Jackson 3 WebMVC consumer](https://github.com/kazforge/jsonapi-java-spring/tree/v0.1.0/examples/jackson3-webmvc)
+
+<!-- x-release-please-end -->
+
+For resource annotations, PATCH, relationships and query semantics, use the
 [framework-neutral jsonapi-java guide](https://jsonapi.kazforge.com/).
