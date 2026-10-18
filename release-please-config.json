@@ -22,7 +22,11 @@
         {"type": "test", "section": "Tests", "hidden": true},
         {"type": "refactor", "section": "Refactoring", "hidden": true}
       ],
-      "extra-files": [{"type": "generic", "path": "gradle.properties"}]
+      "extra-files": [
+        {"type": "generic", "path": "gradle.properties"},
+        {"type": "generic", "path": "docs/site/index.md"},
+        {"type": "generic", "path": "docs/site/webmvc.md"}
+      ]
     }
   }
 }
