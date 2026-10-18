@@ -1,7 +1,7 @@
 buildscript {
     dependencies {
         constraints {
-            classpath("com.fasterxml.jackson.core:jackson-core:2.22.3") {
+            classpath("com.fasterxml.jackson.core:jackson-core:2.22.4") {
                 because("CycloneDX tooling must not resolve vulnerable jackson-core 2.22.2")
             }
         }
