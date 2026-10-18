@@ -53,8 +53,8 @@ For the verified Jackson 3 setup, also add this line to your
 implementation("com.kazforge:jsonapi-java-jackson3:0.4.0")
 ```
 
-The Jackson 3 version matches the verified Core **0.4.0** baseline above.
-Change it only when this Spring release's Core compatibility baseline changes;
+The Jackson 3 version above is this Spring release's verified Core baseline.
+Update it only when Spring deliberately adopts a newer Core baseline;
 Spring and Core are independently versioned. See the
 [Core getting-started guide](https://jsonapi.kazforge.com/getting-started/)
 for the neutral runtime setup. No separate Spring BOM or Boot starter is published.
