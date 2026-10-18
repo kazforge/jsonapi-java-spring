@@ -21,7 +21,7 @@ persistence, authorization and query execution.
 | Java | 21+ |
 | Spring Framework | 7.0.x; minimum **7.0.9** |
 | Servlet API | Jakarta Servlet 6.1 |
-| jsonapi-java API/query | **0.4.0**, included transitively |
+| jsonapi-java API/query | Included transitively; compatible Core baseline below |
 | Consumer runtime | Jackson 3, application-supplied |
 
 The **Spring adapter is Jackson-neutral**. Applications supply a neutral
