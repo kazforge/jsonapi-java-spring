@@ -10,7 +10,7 @@ controllers: media negotiation, request/query context, resource DTO binding and
 protocol errors. Ordinary MVC endpoints are unaffected.
 
 This is a companion to the framework-neutral
-[jsonapi-java guide](https://jsonapi.kazforge.com/). Spring and Core have
+[jsonapi-java guide](https://jsonapi.kazforge.com/core/0.4.0/). Spring and Core have
 **independent release trains**. Your application still owns controllers,
 persistence, authorization and query execution.
 
@@ -30,7 +30,7 @@ Spring Boot auto-configuration, WebFlux and persistence integrations are not
 included. Use a currently patched Spring 7.0.x release; the minimum is not a
 promise of future security updates.
 
-## Dependencies
+## Installation and dependencies
 
 Add the released WebMVC companion from Maven Central:
 
@@ -56,11 +56,8 @@ implementation("com.kazforge:jsonapi-java-jackson3:0.4.0")
 The Jackson 3 version above is this Spring release's verified Core baseline.
 Update it only when Spring deliberately adopts a newer Core baseline;
 Spring and Core are independently versioned. See the
-[Core getting-started guide](https://jsonapi.kazforge.com/getting-started/)
+[Core getting-started guide](https://jsonapi.kazforge.com/core/0.4.0/getting-started/)
 for the neutral runtime setup. No separate Spring BOM or Boot starter is published.
 
-The versioned guide is promoted to the public portal only **after** the Spring
-software release has been published to Maven Central and verified from a clean
-consumer.
-
-**Next:** [Configure a WebMVC endpoint](webmvc.md).
+**Next:** [Register the WebMVC adapter](webmvc.md#register-the-adapter) and
+[opt in per controller](webmvc.md#opt-in-per-controller).
