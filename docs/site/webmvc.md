@@ -7,7 +7,7 @@ description: Wire jsonapi-java-spring-webmvc into an existing Spring MVC applica
 
 Use an existing Spring Framework 7 Servlet-based MVC application. The companion
 does not create a server or supply Spring Boot auto-configuration. Start with
-the [Spring dependencies](index.md#dependencies).
+the [Spring installation and dependencies](index.md#installation-and-dependencies).
 
 ## Register the adapter
 
@@ -73,4 +73,4 @@ release-matched example:
 <!-- x-release-please-end -->
 
 For resource annotations, PATCH, relationships and query semantics, use the
-[framework-neutral jsonapi-java guide](https://jsonapi.kazforge.com/).
+[framework-neutral jsonapi-java guide](https://jsonapi.kazforge.com/core/0.4.0/).
