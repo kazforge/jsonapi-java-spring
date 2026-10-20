@@ -36,8 +36,8 @@ integration hooks:
 5. Expose `JsonApiMediaNegotiationAdvice` as a Spring bean.
 
 Here, `runtime` is the injected, application-supplied `JsonApi` bean.
-The real example's `ConsumerConfiguration` is the verified source for
-exact imports and registration code.
+For exact imports and registration code, see the release-matched
+`ConsumerConfiguration` in the example linked below.
 
 ## Opt in per controller
 
