@@ -16,7 +16,7 @@ without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record du
 | `settings.gradle.kts` | Module membership and dependency repositories. |
 | Root build | Build/quality orchestration and Sonar configuration. |
 | `build-logic` | Reusable formatting and Java library quality conventions. |
-| `jsonapi-java-spring-webmvc` | Neutral WebMVC integration: media negotiation, request/query context, resource DTO binding, protocol errors, and explicit document responses. |
+| `jsonapi-java-spring-webmvc` | Neutral WebMVC integration: media negotiation, request/query context, resource DTO and presence-aware PATCH binding, protocol errors, and explicit document responses. |
 | `examples/jackson3-webmvc` | Non-published application wiring and real Jackson 3 consumer smoke tests. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
@@ -69,6 +69,13 @@ unmarked handlers are not claimed. Applications retain ownership of persistence,
 authorization, route identity, and domain validation policy. Resource and collection values are
 non-null; plain null or bodyless returns remain Spring bodyless responses.
 
+For resource PATCH, the same converter binds `@RequestBody` typed PATCH DTOs through
+`JsonApi.patches().bindPatch`, or an explicit `PatchCommand<T>` through `bindCommand`. One neutral
+document read performs update validation using application-supplied, request-scoped endpoint identity
+before binding. Missing identity fails closed. Core owns presence and PATCH semantics; Spring owns
+type resolution and HTTP adaptation. See [ADR 0007](adr/0007-presence-aware-resource-patch-binding.md)
+for the decision.
+
 Only the raw servlet query string is passed to the public query parser, with an absent string
 treated as empty. The parser owns decoding, syntax, ordering, immutable snapshots, and diagnostic
 attribution. Servlet body/form parameters are not merged. Parsed query state is cached on the
@@ -88,7 +95,9 @@ handler's endpoint marker because request context may not exist when parsing fai
 uses Spring's typed media exceptions, retaining default status handling without this resolver.
 
 Query, neutral document-read, known resource-input, and Spring validation failures produce 400
-responses; negotiation produces 406/415. Errors reuse core `ErrorObject`, `ErrorSource`, and
+responses; endpoint identity conflicts produce 409 and negotiation produces 406/415. Unknown supplied
+PATCH members are client-input failures; invalid PATCH DTO declarations remain server errors.
+Errors reuse core `ErrorObject`, `ErrorSource`, and
 `JsonApiDocument` values with fixed titles and diagnostic codes. Exception details and unverified
 document pointers are omitted. Unrelated mapping, configuration, and application exceptions are not
 classified as client errors.
