@@ -6,15 +6,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.kazforge.jsonapi.api.*;
 import com.kazforge.jsonapi.core.model.*;
+import com.kazforge.jsonapi.core.validation.DocumentUsage;
+import com.kazforge.jsonapi.core.validation.EndpointIdentity;
+import com.kazforge.jsonapi.core.validation.ValidationRuleCode;
 import com.kazforge.jsonapi.diagnostic.*;
 import com.kazforge.jsonapi.document.DocumentReadContext;
+import com.kazforge.jsonapi.document.PrimaryDataKind;
 import com.kazforge.jsonapi.mapping.MappedDocument;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
 import com.kazforge.jsonapi.spring.webmvc.document.JsonApiDocumentResponseWriter;
+import com.kazforge.jsonapi.spring.webmvc.document.JsonApiResourceHttpMessageConverter;
 import com.kazforge.jsonapi.spring.webmvc.media.*;
 import com.kazforge.jsonapi.spring.webmvc.request.*;
 import java.io.*;
 import java.util.*;
+import org.jspecify.annotations.NullMarked;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -23,10 +29,13 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.mock.web.*;
 import org.springframework.test.web.servlet.*;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.method.HandlerMethod;
 
 class JsonApiProtocolTest {
@@ -156,6 +165,19 @@ class JsonApiProtocolTest {
     var mapping = new JsonApiMappingException(MappingDiagnostic.RESOURCE_TYPE_MISMATCH, "secret");
     return java.util.stream.Stream.of(
         Arguments.of(
+            new HttpMessageNotReadableException(
+                "secret",
+                new JsonApiDocumentReadException(
+                    CodecFailureCategory.AGGREGATE_VALIDATION,
+                    "/data/id",
+                    SourceLocation.UNKNOWN,
+                    ValidationRuleCode.ENDPOINT_IDENTITY_MISMATCH,
+                    "private route identity"),
+                input),
+            409,
+            "ENDPOINT_IDENTITY_MISMATCH",
+            "Resource identity conflicts with endpoint"),
+        Arguments.of(
             new HttpMessageNotReadableException("secret", input),
             400,
             "INVALID_REQUEST_DOCUMENT",
@@ -181,6 +203,60 @@ class JsonApiProtocolTest {
             500,
             "RESOURCE_BINDING_FAILED",
             "Internal Server Error"));
+  }
+
+  @Test
+  void patchPassesRequestIdentityToNeutralReaderAndStopsOnValidationFailure() throws Exception {
+    var identity = new EndpointIdentity("articles", "42");
+    var failure =
+        new JsonApiDocumentReadException(
+            CodecFailureCategory.AGGREGATE_VALIDATION,
+            "/data/id",
+            SourceLocation.UNKNOWN,
+            ValidationRuleCode.ENDPOINT_IDENTITY_MISMATCH,
+            "secret");
+    var input = new MockHttpInputMessage(new byte[] {1});
+    var body = input.getBody();
+    var reader =
+        new RecordingRuntime() {
+          @Override
+          @NullMarked
+          public JsonApiDocument read(InputStream json, DocumentReadContext context) {
+            assertSame(body, json);
+            assertEquals(PrimaryDataKind.RESOURCE, context.primaryDataKind());
+            assertEquals(DocumentUsage.UPDATE_REQUEST, context.validationContext().documentUsage());
+            assertEquals(identity, context.validationContext().expectedEndpointIdentity());
+            throw failure;
+          }
+
+          @Override
+          @NullMarked
+          public JsonApiPatches patches() {
+            throw new AssertionError("Invalid documents must not reach PATCH binding");
+          }
+        };
+    var request = new MockHttpServletRequest("PATCH", "/articles/42");
+    new JsonApiRequestContextInterceptor()
+        .preHandle(
+            request,
+            new MockHttpServletResponse(),
+            new HandlerMethod(new Controller(), "api", JsonApiRequestContext.class));
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    try {
+      var converter =
+          new JsonApiResourceHttpMessageConverter(
+              reader,
+              current -> {
+                assertSame(request, current);
+                return identity;
+              });
+      var wrapped =
+          assertThrows(
+              HttpMessageNotReadableException.class, () -> converter.read(Object.class, input));
+      assertSame(failure, wrapped.getCause());
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
   }
 
   @Test

@@ -12,3 +12,4 @@ their replacements. See [Architecture](../architecture.md) for current structure
 | [0004 — Operation-aware request and query context](0004-operation-aware-request-and-query-context.md) | Accepted |
 | [0005 — Safe protocol errors and explicit document transport](0005-safe-protocol-errors-and-explicit-document-transport.md) | Accepted |
 | [0006 — Independent Spring release lifecycle](0006-independent-spring-release-lifecycle.md) | Accepted |
+| [0007 — Presence-aware resource PATCH binding](0007-presence-aware-resource-patch-binding.md) | Accepted |
