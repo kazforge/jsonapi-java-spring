@@ -16,7 +16,7 @@ Register this configuration in your servlet application's WebMVC context. The ex
 does not supply a server launcher or persistence implementation.
 
 [`ArticleController`](src/main/java/com/kazforge/jsonapi/example/ArticleController.java)
-accepts ordinary `@RequestBody Article` values and returns DTOs or typed lists.
+handles article creation, reads, and presence-aware updates using the same resource model.
 Annotated mappings deliberately omit `consumes` and `produces`, leaving JSON:API
 negotiation to the adapter. For example:
 
@@ -31,11 +31,36 @@ Accept: application/vnd.api+json
 The response is `201 Created`, with `Location: /articles/42`, `Vary: Accept`, and
 `application/vnd.api+json` resource data containing ID `42` and title `Hello`.
 The fixed server ID is illustrative only; applications own allocation and persistence.
-An explicitly supplied ID is preserved. GET `/articles/42`, `/articles`, and
+An explicitly supplied ID is preserved. GET `/articles/{id}`, `/articles`, and
 `/articles/empty` demonstrate singleton, list, and empty-list responses.
-The unmarked `/ordinary` endpoint retains Spring's ordinary JSON handling.
+The unmarked `/ordinary` endpoint retains Spring's ordinary JSON handling for GET and
+echoes plain `Article` JSON on PATCH.
+
+## Updating an article
+
+The same application configuration registers route-derived identity resolution and a
+Spring validator for `ArticlePatch`. The controller applies the bound changes to the
+sample article and returns its JSON:API representation:
+
+```http
+PATCH /articles/42
+Content-Type: application/vnd.api+json
+Accept: application/vnd.api+json
+
+{"data":{"type":"articles","id":"42","attributes":{"title":"Updated"}}}
+```
+
+The response is `200 OK` with title `Updated`. Omitted `title` or `editor` members retain
+their sample values; explicit null clears them. A non-null title must be nonblank.
+The `editor` relationship accepts resource linkage; `included` resources do not become
+additional updates. Route/body identity conflicts produce `409` errors.
+
+This demo is stateless: each PATCH starts from the same snapshot returned by GET, and
+subsequent GETs do not reflect POST or PATCH responses. A real application would load
+and persist the article around the same presence-aware update logic.
 
 The context-backed MockMvc suite uses the real published runtime, not a recording
-substitute. It checks create binding, resource responses, headers, ordinary MVC,
-and representative `400`/`406`/`415` error documents. It is a consumer smoke test,
+substitute. It exercises the production configuration and controllers for create,
+read, update, validation, and ordinary MVC.
+It checks representative `400`/`406`/`409`/`415` error documents. It is a consumer smoke test,
 not another Core conformance suite or Spring compatibility matrix.

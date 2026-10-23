@@ -4,6 +4,7 @@ import com.kazforge.jsonapi.api.JsonApi;
 import com.kazforge.jsonapi.core.model.ErrorObject;
 import com.kazforge.jsonapi.core.model.ErrorSource;
 import com.kazforge.jsonapi.core.model.JsonApiDocument;
+import com.kazforge.jsonapi.core.validation.ValidationRuleCode;
 import com.kazforge.jsonapi.diagnostic.JsonApiDocumentReadException;
 import com.kazforge.jsonapi.diagnostic.JsonApiMappingException;
 import com.kazforge.jsonapi.query.JsonApiQueryException;
@@ -92,6 +93,16 @@ public final class JsonApiProtocolExceptionResolver implements HandlerExceptionR
   }
 
   private static ProtocolFailure documentFailure(JsonApiDocumentReadException read) {
+    if (read.ruleCode() == ValidationRuleCode.ENDPOINT_IDENTITY_MISMATCH) {
+      HttpStatus status = HttpStatus.CONFLICT;
+      return new ProtocolFailure(
+          status,
+          ErrorObject.builder()
+              .status(Integer.toString(status.value()))
+              .code(ValidationRuleCode.ENDPOINT_IDENTITY_MISMATCH.name())
+              .title("Resource identity conflicts with endpoint")
+              .build());
+    }
     return badRequest(read.category(), "Invalid JSON:API document", null);
   }
 
