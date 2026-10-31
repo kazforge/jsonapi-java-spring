@@ -1,7 +1,9 @@
 package com.kazforge.jsonapi.example;
 
 import com.kazforge.jsonapi.api.JsonApi;
+import com.kazforge.jsonapi.core.validation.EndpointIdentity;
 import com.kazforge.jsonapi.jackson3.JsonApiJackson3;
+import com.kazforge.jsonapi.patch.PatchPresence;
 import com.kazforge.jsonapi.spring.webmvc.document.JsonApiResourceHttpMessageConverter;
 import com.kazforge.jsonapi.spring.webmvc.error.JsonApiProtocolExceptionResolver;
 import com.kazforge.jsonapi.spring.webmvc.media.JsonApiMediaNegotiationAdvice;
@@ -9,11 +11,15 @@ import com.kazforge.jsonapi.spring.webmvc.media.JsonApiMediaNegotiationIntercept
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContextArgumentResolver;
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContextInterceptor;
 import java.util.List;
+import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.HttpMessageConverters;
+import org.springframework.validation.Errors;
+import org.springframework.validation.Validator;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.HandlerExceptionResolver;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -51,7 +57,37 @@ public class ConsumerConfiguration implements WebMvcConfigurer {
 
   @Override
   public void configureMessageConverters(HttpMessageConverters.ServerBuilder builder) {
-    builder.addCustomConverter(new JsonApiResourceHttpMessageConverter(runtime));
+    builder.addCustomConverter(
+        new JsonApiResourceHttpMessageConverter(
+            runtime,
+            request -> {
+              Object attribute =
+                  request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+              if (attribute instanceof Map<?, ?> variables
+                  && variables.get("id") instanceof String id) {
+                return new EndpointIdentity("articles", id);
+              }
+              return null;
+            }));
+  }
+
+  @Override
+  public Validator getValidator() {
+    return new Validator() {
+      @Override
+      public boolean supports(Class<?> type) {
+        return type == ArticlePatch.class;
+      }
+
+      @Override
+      public void validate(Object target, Errors errors) {
+        if (((ArticlePatch) target).title() instanceof PatchPresence.Present<String>(var title)
+            && title != null
+            && title.isBlank()) {
+          errors.rejectValue("title", "blank", "A supplied title must be nonblank or null");
+        }
+      }
+    };
   }
 
   @Override
