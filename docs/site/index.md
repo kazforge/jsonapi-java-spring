@@ -38,7 +38,7 @@ Add the released WebMVC companion from Maven Central:
 
 ```kotlin
 dependencies {
-    implementation("com.kazforge:jsonapi-java-spring-webmvc:0.1.0")
+    implementation("com.kazforge:jsonapi-java-spring-webmvc:0.1.1")
 }
 ```
 
