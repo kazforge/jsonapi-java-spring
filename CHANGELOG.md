@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.1](https://github.com/kazforge/jsonapi-java-spring/compare/v0.1.0...v0.1.1) (2026-10-31)
+
+
+### Bug Fixes
+
+* **build:** constrain CycloneDX Guava to patched version ([270b057](https://github.com/kazforge/jsonapi-java-spring/commit/270b057bfa0e2b71de43f2071b660f50878c2c1b))
+* **ci:** verify dependency graph plugin 1.5.1 ([d14f194](https://github.com/kazforge/jsonapi-java-spring/commit/d14f1947c4e2cf78382faf5868c4855a483a054d))
+* **deps:** update dependency com.google.errorprone:error_prone_core to v2.51.0 ([9468d2c](https://github.com/kazforge/jsonapi-java-spring/commit/9468d2c1bcadfefc5d8bc60933427f61a4897b36))
+* **deps:** update dependency com.uber.nullaway:nullaway to v0.14.3 ([b1c464c](https://github.com/kazforge/jsonapi-java-spring/commit/b1c464c8006104411899ef64e0b1b646a1e8e552))
+* **deps:** update dependency net.ltgt.errorprone:net.ltgt.errorprone.gradle.plugin to v5.2.0 ([7ee6bf0](https://github.com/kazforge/jsonapi-java-spring/commit/7ee6bf03ad319ab33c650f821c7991f5ddc63be6))
+* **deps:** update dependency org.springframework:spring-framework-bom to v7.0.10 ([b1ae3cd](https://github.com/kazforge/jsonapi-java-spring/commit/b1ae3cd71aaf3ace03d9572f8f1df9bef11c30d1))
+
 ## 0.1.0 (2026-10-18)
 
 First public release of **jsonapi-java-spring**, the opt-in JSON:API 1.1
