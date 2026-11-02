@@ -35,7 +35,7 @@ jobs:
           permission-vulnerability-alerts: read
           permission-members: read
       - name: Run Renovate
-        uses: renovatebot/github-action@43b963bf5dd5e57f1f95c59765a018d782870211 # v46.3.11
+        uses: renovatebot/github-action@1c0cf989c02653fba0efe7ca5772338860ca71dc # v46.3.12
         with:
           token: ${{ steps.app-token.outputs.token }}
           renovate-image: ghcr.io/renovatebot/renovate:44.199.0@sha256:76e0fb8c982004f8f9a6dd041a777f9c8aee6b4b852da862a1217c5ec550e6d9
