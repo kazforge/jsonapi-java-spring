@@ -1,7 +1,7 @@
 [versions]
 spotless = "8.10.4"
 jspecify = "1.0.1"
-errorprone = "2.51.0"
+errorprone = "2.52.0"
 nullaway = "0.14.3"
 errorprone-plugin = "5.2.0"
 nullaway-plugin = "3.3.0"
