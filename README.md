@@ -11,8 +11,11 @@ semantics.
 The adapter targets Core 0.4.0. Configure `JsonApiResourceHttpMessageConverter` through Spring 7's
 `WebMvcConfigurer#configureMessageConverters(HttpMessageConverters.ServerBuilder)` to bind resource
 POST bodies and serialize DTOs; `JsonApiResponse<T>` adds optional top-level metadata, links, or a
-JSON:API object. The converter uses the request's opted-in resource context and leaves relationship and
-ordinary MVC handlers alone.
+JSON:API object. Resource PATCH binds typed `PatchPresence<T>` DTO members, or an explicit
+`PatchCommand<T>`, without applying mutations. PATCH requires an application-supplied route identity
+callback on the converter; validation compares the request's type/id against that identity.
+The converter uses the request's opted-in resource context and leaves relationship and ordinary
+MVC handlers alone.
 Spring modules consume released jsonapi-java artifacts from
 Maven Central, not a sibling source checkout.
 
