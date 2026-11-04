@@ -46,8 +46,8 @@ class PatchIntegrationTest {
                       .contentType(JSON_API)
                       .content(
                           """
-          {"data":{"type":"articles","id":"%s","attributes":{"title":null}}}
-          """
+                          {"data":{"type":"articles","id":"%s","attributes":{"title":null}}}
+                          """
                               .formatted(id)))
               .andExpect(status().isOk())
               .andExpect(content().contentType(JSON_API))
@@ -68,8 +68,8 @@ class PatchIntegrationTest {
                     .contentType(JSON_API)
                     .content(
                         """
-        {"data":{"type":"articles","id":"42","attributes":{"title":"Updated"}}}
-        """))
+                        {"data":{"type":"articles","id":"42","attributes":{"title":"Updated"}}}
+                        """))
             .andExpect(status().isOk())
             .andExpect(content().contentType(JSON_API))
             .andReturn()
@@ -88,10 +88,10 @@ class PatchIntegrationTest {
                     .contentType(JSON_API)
                     .content(
                         """
-        {"data":{"type":"articles","id":"42","relationships":{
-          "editor":{"data":{"type":"people","id":"9"}}}},
-         "included":[{"type":"people","id":"9","attributes":{"unknown":"not a PATCH DTO"}}]}
-        """))
+                        {"data":{"type":"articles","id":"42","relationships":{
+                          "editor":{"data":{"type":"people","id":"9"}}}},
+                         "included":[{"type":"people","id":"9","attributes":{"unknown":"not a PATCH DTO"}}]}
+                        """))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse();
@@ -139,8 +139,8 @@ class PatchIntegrationTest {
                     .contentType(JSON_API)
                     .content(
                         """
-        {"id":"42","title":"ordinary DTO"}
-        """))
+                        {"id":"42","title":"ordinary DTO"}
+                        """))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse();
