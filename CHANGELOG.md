@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.0](https://github.com/kazforge/jsonapi-java-spring/compare/v0.1.0...v0.2.0) (2026-11-04)
+
+### Features
+
+* **webmvc:** add presence-aware resource PATCH binding ([bb1d5a1](https://github.com/kazforge/jsonapi-java-spring/commit/bb1d5a15a8f4ebe0257022977f09915e928675ea))
+
+Resource PATCH endpoints can now bind typed `PatchPresence<T>` DTOs or explicit
+`PatchCommand<T>` values. The adapter validates resource identity against the endpoint;
+applications still own authorization and applying changes.
+
 ## 0.1.0 (2026-10-18)
 
 First public release of **jsonapi-java-spring**, the opt-in JSON:API 1.1
