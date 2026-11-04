@@ -55,11 +55,10 @@ class JsonApiProtocolTest {
   void queryErrorsAreSafe(String input, String code, String parameter) throws Exception {
     mvc.perform(
             get("/api")
-                .with(
-                    r -> {
-                      r.setQueryString(input);
-                      return r;
-                    }))
+                .with(r -> {
+                  r.setQueryString(input);
+                  return r;
+                }))
         .andExpect(status().isBadRequest())
         .andExpect(content().contentType("application/vnd.api+json"))
         .andExpect(header().string("Vary", "Accept"));
