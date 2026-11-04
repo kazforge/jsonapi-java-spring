@@ -24,8 +24,8 @@ and commit range so squash and rebase merges remain supported. See
 Use `feat`, `fix`, and `perf` for user-facing changes. Routine dependency,
 build, and CI maintenance should use `chore` or `ci`, which Release Please hides.
 
-Renovate defaults dependency updates to `chore`. Use `fix` for consumer-visible
-bug fixes, including runtime security fixes. Mark breaking changes explicitly.
+Renovate defaults routine updates to `chore`; vulnerability-alert fixes use `fix`.
+Mark other consumer-visible bug fixes and breaking changes explicitly.
 
 ## Build conventions
 

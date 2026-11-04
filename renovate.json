@@ -29,5 +29,6 @@
       "matchPackageNames": ["org.springframework:spring-framework-bom"],
       "allowedVersions": "/^7\\.0\\.\\d+$/"
     }
-  ]
+  ],
+  "vulnerabilityAlerts": {"semanticCommitType": "fix"}
 }
