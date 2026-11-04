@@ -19,6 +19,14 @@ with `!` before the colon or a `BREAKING CHANGE:` footer. CI checks both the tit
 and commit range so squash and rebase merges remain supported. See
 [ADR 0006](docs/adr/0006-independent-spring-release-lifecycle.md) for release semantics.
 
+### Release notes
+
+Use `feat`, `fix`, and `perf` for user-facing changes. Routine dependency,
+build, and CI maintenance should use `chore` or `ci`, which Release Please hides.
+
+Renovate defaults dependency updates to `chore`. Use `fix` for consumer-visible
+bug fixes, including runtime security fixes. Mark breaking changes explicitly.
+
 ## Build conventions
 
 `settings.gradle.kts` owns module membership. The root has no production sources.
