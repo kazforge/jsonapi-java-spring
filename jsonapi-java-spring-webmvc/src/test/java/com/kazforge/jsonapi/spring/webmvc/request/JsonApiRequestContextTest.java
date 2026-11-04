@@ -90,13 +90,12 @@ class JsonApiRequestContextTest {
     var result =
         mvc.perform(
                 post("/resource")
-                    .with(
-                        request -> {
-                          request.setQueryString(
-                              "page[cursor]=a%2Bb&page[cursor]=%2520&filter[x]=a+b&custom=z&other=q&custom=");
-                          request.addParameter("bodyOnly", "ignored");
-                          return request;
-                        }))
+                    .with(request -> {
+                      request.setQueryString(
+                          "page[cursor]=a%2Bb&page[cursor]=%2520&filter[x]=a+b&custom=z&other=q&custom=");
+                      request.addParameter("bodyOnly", "ignored");
+                      return request;
+                    }))
             .andExpect(status().isOk())
             .andReturn();
     var query = context(result).query();
@@ -157,11 +156,10 @@ class JsonApiRequestContextTest {
             () ->
                 mvc.perform(
                     get("/resource")
-                        .with(
-                            request -> {
-                              request.setQueryString(input);
-                              return request;
-                            })));
+                        .with(request -> {
+                          request.setQueryString(input);
+                          return request;
+                        })));
     var cause = assertInstanceOf(JsonApiQueryException.class, failure.getCause());
     assertEquals(diagnostic, cause.diagnostic());
     assertEquals(parameter, cause.parameterName());

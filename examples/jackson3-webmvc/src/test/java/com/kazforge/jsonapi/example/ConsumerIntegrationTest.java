@@ -48,8 +48,8 @@ class ConsumerIntegrationTest {
                         .accept(JSON_API)
                         .content(
                             """
-            {"data":{"type":"articles","attributes":{"title":"Created without ID"}}}
-            """))
+                            {"data":{"type":"articles","attributes":{"title":"Created without ID"}}}
+                            """))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/articles/42"))
                 .andExpect(header().string("Vary", "Accept"))
@@ -77,8 +77,8 @@ class ConsumerIntegrationTest {
                         .accept(JSON_API)
                         .content(
                             """
-            {"data":{"type":"articles","id":"%s","attributes":{"title":"Client ID"}}}
-            """
+                            {"data":{"type":"articles","id":"%s","attributes":{"title":"Client ID"}}}
+                            """
                                 .formatted(id)))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", location))
