@@ -5,6 +5,7 @@ import com.kazforge.jsonapi.core.validation.EndpointIdentity;
 import com.kazforge.jsonapi.jackson3.JsonApiJackson3;
 import com.kazforge.jsonapi.patch.PatchPresence;
 import com.kazforge.jsonapi.spring.webmvc.document.JsonApiResourceHttpMessageConverter;
+import com.kazforge.jsonapi.spring.webmvc.error.JsonApiErrorHttpMessageConverter;
 import com.kazforge.jsonapi.spring.webmvc.error.JsonApiProtocolExceptionResolver;
 import com.kazforge.jsonapi.spring.webmvc.media.JsonApiMediaNegotiationAdvice;
 import com.kazforge.jsonapi.spring.webmvc.media.JsonApiMediaNegotiationInterceptor;
@@ -57,6 +58,7 @@ public class ConsumerConfiguration implements WebMvcConfigurer {
 
   @Override
   public void configureMessageConverters(HttpMessageConverters.ServerBuilder builder) {
+    builder.addCustomConverter(new JsonApiErrorHttpMessageConverter(runtime));
     builder.addCustomConverter(
         new JsonApiResourceHttpMessageConverter(
             runtime,

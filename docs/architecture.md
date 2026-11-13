@@ -16,7 +16,7 @@ without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record du
 | `settings.gradle.kts` | Module membership and dependency repositories. |
 | Root build | Build/quality orchestration and Sonar configuration. |
 | `build-logic` | Reusable formatting and Java library quality conventions. |
-| `jsonapi-java-spring-webmvc` | Neutral WebMVC integration: media negotiation, request/query context, resource DTO and presence-aware PATCH binding, protocol errors, and explicit document responses. |
+| `jsonapi-java-spring-webmvc` | Neutral WebMVC integration: media negotiation, request/query context, resource DTO and presence-aware PATCH binding, protocol and application errors, and explicit document responses. |
 | `examples/jackson3-webmvc` | Non-published application wiring and real Jackson 3 consumer smoke tests. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
@@ -102,11 +102,23 @@ Errors reuse core `ErrorObject`, `ErrorSource`, and
 document pointers are omitted. Unrelated mapping, configuration, and application exceptions are not
 classified as client errors.
 
+### Application errors
+
+Controllers and application-owned exception advice return `ResponseEntity<JsonApiErrorResponse>`
+(or `@ResponseStatus` with `JsonApiErrorResponse`) containing Core `ErrorObject` values and an
+optional `DocumentEnvelope`. `JsonApiErrorHttpMessageConverter` checks the originally matched
+`@JsonApiEndpoint` handler—covering both resource and relationship endpoints without requiring an
+annotated advice class or parsed query context—and delegates to `JsonApiDocumentResponseWriter`.
+Spring owns the HTTP status and headers; error object `status` members are neither inferred nor
+rewritten. See [ADR 0008](adr/0008-explicit-webmvc-application-error-responses.md).
+
+### Shared document transport
+
 `JsonApiDocumentResponseWriter` accepts a neutral document, explicit HTTP status and servlet
-response for advanced use. Raw reads require an explicit `DocumentReadContext` through the runtime.
-Serialization delegates to `JsonApi.documents()` for advanced documents and `JsonApi.resources()`
-for conventional DTOs, preserving runtime defaults without a Spring-owned serializer or runtime
-discovery.
+response for advanced and error responses. Raw reads require an explicit `DocumentReadContext`
+through the runtime. Serialization delegates to `JsonApi.documents()` for documents and
+`JsonApi.resources()` for conventional DTOs, so Core's resource-write version default applies only
+to resource responses while explicit document envelopes are written as supplied.
 
 Both response paths serialize fully before writing. The DTO converter skips committed responses and
 resets uncommitted output mode while restoring status and headers; the advanced writer likewise

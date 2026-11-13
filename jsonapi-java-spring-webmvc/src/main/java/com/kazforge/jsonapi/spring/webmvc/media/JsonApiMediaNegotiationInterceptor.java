@@ -1,6 +1,7 @@
 package com.kazforge.jsonapi.spring.webmvc.media;
 
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
+import com.kazforge.jsonapi.spring.webmvc.internal.JsonApiHandlers;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
@@ -10,7 +11,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.util.StringUtils;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
-import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
@@ -31,7 +31,7 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
   @Override
   public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
       throws Exception {
-    if (!isJsonApiHandler(handler)) {
+    if (!JsonApiHandlers.isEndpoint(handler)) {
       return true;
     }
     if (hasBody(request) && !hasValidContentType(request)) {
@@ -48,14 +48,6 @@ public class JsonApiMediaNegotiationInterceptor implements HandlerInterceptor {
     response.setContentType(negotiated);
     mergeVary(response);
     return true;
-  }
-
-  static boolean isJsonApiHandler(Object handler) {
-    if (!(handler instanceof HandlerMethod method)) {
-      return false;
-    }
-    return method.getMethodAnnotation(JsonApiEndpoint.class) != null
-        || method.getBeanType().isAnnotationPresent(JsonApiEndpoint.class);
   }
 
   /**

@@ -3,10 +3,10 @@ package com.kazforge.jsonapi.spring.webmvc.request;
 import com.kazforge.jsonapi.query.JsonApiQuery;
 import com.kazforge.jsonapi.query.JsonApiQueryParser;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
+import com.kazforge.jsonapi.spring.webmvc.internal.JsonApiHandlers;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
-import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
@@ -30,13 +30,7 @@ public class JsonApiRequestContextInterceptor implements HandlerInterceptor {
 
   private void prepareContext(HttpServletRequest request, Object handler) {
     request.removeAttribute(JsonApiRequestContext.ATTRIBUTE);
-    if (!(handler instanceof HandlerMethod method)) {
-      return;
-    }
-    JsonApiEndpoint endpoint = method.getMethodAnnotation(JsonApiEndpoint.class);
-    if (endpoint == null) {
-      endpoint = method.getBeanType().getAnnotation(JsonApiEndpoint.class);
-    }
+    JsonApiEndpoint endpoint = JsonApiHandlers.findEndpoint(handler);
     if (endpoint == null) {
       return;
     }

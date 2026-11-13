@@ -15,7 +15,8 @@ JSON:API object. Resource PATCH binds typed `PatchPresence<T>` DTO members, or a
 `PatchCommand<T>`, without applying mutations. PATCH requires an application-supplied route identity
 callback on the converter; validation compares the request's type/id against that identity.
 The converter uses the request's opted-in resource context and leaves relationship and ordinary
-MVC handlers alone.
+MVC handlers alone. Controllers and application exception handlers can also return
+`ResponseEntity<JsonApiErrorResponse>` by registering `JsonApiErrorHttpMessageConverter(runtime)`.
 Spring modules consume released jsonapi-java artifacts from
 Maven Central, not a sibling source checkout.
 
