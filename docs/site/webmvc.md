@@ -36,6 +36,9 @@ integration hooks:
 5. Expose `JsonApiMediaNegotiationAdvice` as a Spring bean.
 
 Here, `runtime` is the injected, application-supplied `JsonApi` bean.
+For application-owned error responses, also register `JsonApiErrorHttpMessageConverter(runtime)`
+with `addCustomConverter` so controllers and exception handlers can return
+`ResponseEntity<JsonApiErrorResponse>`.
 For exact imports and registration code, see the release-matched
 `ConsumerConfiguration` in the example linked below.
 

@@ -8,8 +8,8 @@ import com.kazforge.jsonapi.core.validation.ValidationRuleCode;
 import com.kazforge.jsonapi.diagnostic.JsonApiDocumentReadException;
 import com.kazforge.jsonapi.diagnostic.JsonApiMappingException;
 import com.kazforge.jsonapi.query.JsonApiQueryException;
-import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
 import com.kazforge.jsonapi.spring.webmvc.document.JsonApiDocumentResponseWriter;
+import com.kazforge.jsonapi.spring.webmvc.internal.JsonApiHandlers;
 import com.kazforge.jsonapi.spring.webmvc.internal.ProtocolError;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,7 +23,6 @@ import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.ModelAndView;
 
@@ -45,9 +44,7 @@ public final class JsonApiProtocolExceptionResolver implements HandlerExceptionR
       HttpServletResponse response,
       @Nullable Object handler,
       Exception exception) {
-    if (!(handler instanceof HandlerMethod method)
-        || (method.getMethodAnnotation(JsonApiEndpoint.class) == null
-            && !method.getBeanType().isAnnotationPresent(JsonApiEndpoint.class))) {
+    if (!JsonApiHandlers.isEndpoint(handler)) {
       return null;
     }
     ProtocolFailure error = classify(exception);

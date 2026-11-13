@@ -14,6 +14,7 @@ import com.kazforge.jsonapi.document.DocumentEnvelope;
 import com.kazforge.jsonapi.document.DocumentReadContext;
 import com.kazforge.jsonapi.document.PrimaryDataKind;
 import com.kazforge.jsonapi.patch.PatchCommand;
+import com.kazforge.jsonapi.spring.webmvc.error.JsonApiErrorResponse;
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -291,6 +292,8 @@ public final class JsonApiResourceHttpMessageConverter
     if (raw == null
         || CharSequence.class.isAssignableFrom(raw)
         || raw.isArray()
+        || raw == JsonApiErrorResponse.class
+        || valueClass == JsonApiErrorResponse.class
         || JsonApiDocument.class.isAssignableFrom(raw)) {
       return false;
     }
@@ -308,6 +311,7 @@ public final class JsonApiResourceHttpMessageConverter
     Class<?> raw = resolved == null ? null : ResolvableType.forType(resolved).resolve();
     return raw != null
         && raw != byte[].class
+        && raw != JsonApiErrorResponse.class
         && !CharSequence.class.isAssignableFrom(raw)
         && !JsonApiDocument.class.isAssignableFrom(raw);
   }
