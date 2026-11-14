@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/kazforge/jsonapi-java-spring/compare/v0.2.0...v0.3.0) (2026-11-14)
+
+
+### Features
+
+* **webmvc:** add application error responses ([edccb40](https://github.com/kazforge/jsonapi-java-spring/commit/edccb40fd913d9cb0e1ad05f16696953c26aaebf))
+
 ## [0.2.0](https://github.com/kazforge/jsonapi-java-spring/compare/v0.1.0...v0.2.0) (2026-11-04)
 
 ### Features
