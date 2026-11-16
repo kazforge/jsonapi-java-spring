@@ -71,9 +71,47 @@ release-matched example:
 
 <!-- x-release-please-start-version -->
 
-[Tested Jackson 3 WebMVC consumer](https://github.com/kazforge/jsonapi-java-spring/tree/v0.2.0/examples/jackson3-webmvc)
+[Tested Jackson 3 WebMVC consumer](https://github.com/kazforge/jsonapi-java-spring/tree/v0.3.0/examples/jackson3-webmvc)
 
 <!-- x-release-please-end -->
+
+## Application errors
+
+With `JsonApiErrorHttpMessageConverter(runtime)` registered as above, return
+`ResponseEntity<JsonApiErrorResponse>` containing Core `ErrorObject` values:
+
+```java
+import com.kazforge.jsonapi.core.model.ErrorObject;
+import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
+import com.kazforge.jsonapi.spring.webmvc.error.JsonApiErrorResponse;
+import java.util.NoSuchElementException;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@JsonApiEndpoint
+class ApplicationErrorController {
+    @GetMapping("/articles/missing")
+    public ResponseEntity<JsonApiErrorResponse> notFound() {
+        return ResponseEntity.status(404)
+            .body(JsonApiErrorResponse.of(ErrorObject.ofTitle("Article not found")));
+    }
+
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<JsonApiErrorResponse> handleMissingArticle() {
+        return notFound();
+    }
+}
+```
+
+The handler uses the same response when this controller throws `NoSuchElementException`.
+Application-owned `@RestControllerAdvice` can return it too; the originally matched handler
+must be opted in with `@JsonApiEndpoint`.
+
+The application owns the HTTP status and error content. The adapter writes the supplied errors
+as a JSON:API error document; it does not infer or rewrite error `status` members from the HTTP status.
 
 ## Resource PATCH
 
