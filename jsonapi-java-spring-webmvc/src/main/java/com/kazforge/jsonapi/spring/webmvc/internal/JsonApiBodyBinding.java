@@ -20,13 +20,13 @@ public record JsonApiBodyBinding(JsonApiRequestContext dispatch, BoundResource<?
     return resource;
   }
 
-  public static @Nullable BoundResource<?> find(
+  public static @Nullable JsonApiBodyBinding find(
       HttpServletRequest request, @Nullable Object target) {
-    return request.getAttribute(ATTRIBUTE) instanceof JsonApiBodyBinding(var dispatch, var bound)
-            && dispatch == JsonApiRequestContext.find(request)
+    return request.getAttribute(ATTRIBUTE) instanceof JsonApiBodyBinding binding
+            && binding.dispatch() == JsonApiRequestContext.find(request)
             && target != null
-            && bound.resource() == target
-        ? bound
+            && binding.bound().resource() == target
+        ? binding
         : null;
   }
 

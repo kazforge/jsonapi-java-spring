@@ -276,10 +276,14 @@ class PatchIntegrationTest {
   @JsonApiEndpoint
   static class ValidationController {
     @PostMapping("/validation/articles")
-    void create(@Valid @RequestBody ArticleCreate input) {}
+    void create(@Valid @RequestBody ArticleCreate input) {
+      fail("Invalid create input must not reach the controller");
+    }
 
     @PatchMapping("/validation/articles/{id}")
-    void update(@Valid @RequestBody ValidatedPatch input) {}
+    void update(@Valid @RequestBody ValidatedPatch input) {
+      fail("Invalid PATCH input must not reach the controller");
+    }
   }
 
   @JsonApiResource(type = "articles")

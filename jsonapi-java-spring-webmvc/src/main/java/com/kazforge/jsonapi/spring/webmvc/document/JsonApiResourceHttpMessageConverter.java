@@ -117,14 +117,16 @@ public final class JsonApiResourceHttpMessageConverter
       @Nullable Type type, @Nullable Class<?> contextClass, HttpInputMessage inputMessage)
       throws IOException {
     HttpServletRequest request = currentServletRequest();
-    JsonApiRequestContext context = request == null ? null : JsonApiRequestContext.find(request);
-    boolean patch = context != null && HttpMethod.PATCH.equals(context.method());
-    if (request != null) {
-      JsonApiBodyBinding.clear(request);
-    }
+    JsonApiRequestContext context = null;
+    boolean patch = false;
     try {
-      if (patch && request != null) {
-        return readPatch(type, contextClass, inputMessage, request, context);
+      if (request != null) {
+        context = JsonApiRequestContext.find(request);
+        JsonApiBodyBinding.clear(request);
+        if (context != null && HttpMethod.PATCH.equals(context.method())) {
+          patch = true;
+          return readPatch(type, contextClass, inputMessage, request, context);
+        }
       }
       return JsonApiBodyBinding.remember(
           request, context, readCreate(type, contextClass, inputMessage));
@@ -173,7 +175,7 @@ public final class JsonApiResourceHttpMessageConverter
       @Nullable Class<?> contextClass,
       HttpInputMessage inputMessage,
       HttpServletRequest request,
-      @Nullable JsonApiRequestContext context)
+      JsonApiRequestContext context)
       throws IOException {
     Type targetType = resolveTargetType(type, contextClass);
     if (targetType == null

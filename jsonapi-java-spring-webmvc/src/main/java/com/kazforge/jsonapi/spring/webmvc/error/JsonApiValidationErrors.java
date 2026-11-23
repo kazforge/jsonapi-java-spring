@@ -29,7 +29,7 @@ import org.springframework.web.servlet.HandlerMapping;
 /** Adapts validation paths to Core's logical source lookup without inspecting the DTO. */
 final class JsonApiValidationErrors {
   private static final Pattern SPRING_SEGMENT =
-      Pattern.compile("(?:^|\\.)([A-Za-z_$][A-Za-z0-9_$]*)|\\[(0|[1-9][0-9]*)\\]");
+      Pattern.compile("(?:^|\\.)([A-Za-z_$][A-Za-z0-9_$]*)|\\[(0|[1-9]\\d*)\\]");
 
   private JsonApiValidationErrors() {}
 
@@ -49,8 +49,8 @@ final class JsonApiValidationErrors {
         || !result.hasErrors()) {
       return Optional.empty();
     }
-    BoundResource<?> bound = JsonApiBodyBinding.find(request, result.getTarget());
-    return bound == null ? Optional.empty() : Optional.of(map(result, bound));
+    JsonApiBodyBinding binding = JsonApiBodyBinding.find(request, result.getTarget());
+    return binding == null ? Optional.empty() : Optional.of(map(result, binding.bound()));
   }
 
   static JsonApiErrorResponse map(BindingResult result, BoundResource<?> bound) {
@@ -96,29 +96,35 @@ final class JsonApiValidationErrors {
   private static @Nullable List<String> constraintPath(Path path) {
     List<String> segments = new ArrayList<>();
     for (Path.Node node : path) {
-      // In cascaded validation, a property/bean node can carry the enclosing element's
-      // index too. Never traverse an opaque iteration or treat a map key as an index.
-      ElementKind kind = node.getKind();
-      if ((kind != ElementKind.PROPERTY
-              && kind != ElementKind.BEAN
-              && kind != ElementKind.CONTAINER_ELEMENT)
-          || !appendIndex(node, segments)) {
+      if (!appendConstraintNode(node, segments)) {
         break;
       }
-      if (kind == ElementKind.BEAN) {
+      if (node.getKind() == ElementKind.BEAN) {
         return segments; // Bean nodes are leaves; a root bean has no segments.
-      }
-      if (kind == ElementKind.PROPERTY) {
-        String name = node.getName();
-        if (name == null || name.isEmpty()) {
-          break;
-        }
-        segments.add(name);
-      } else if (!node.isInIterable() && !isTransparentWrapper(node)) {
-        break;
       }
     }
     return segments.isEmpty() ? null : segments;
+  }
+
+  private static boolean appendConstraintNode(Path.Node node, List<String> segments) {
+    // In cascaded validation, a property/bean node can carry the enclosing element's index too.
+    return switch (node.getKind()) {
+      case PROPERTY -> {
+        if (!appendIndex(node, segments)) {
+          yield false;
+        }
+        String name = node.getName();
+        if (name == null || name.isEmpty()) {
+          yield false;
+        }
+        segments.add(name);
+        yield true;
+      }
+      case BEAN -> appendIndex(node, segments);
+      case CONTAINER_ELEMENT ->
+          node.isInIterable() ? appendIndex(node, segments) : isTransparentWrapper(node);
+      case null, default -> false;
+    };
   }
 
   private static boolean appendIndex(Path.Node node, List<String> segments) {
@@ -126,6 +132,7 @@ final class JsonApiValidationErrors {
       return true;
     }
     Integer index = node.getIndex();
+    // Never traverse an opaque iteration or treat a map key as an index.
     if (node.getKey() != null || index == null || index < 0) {
       return false;
     }
@@ -139,19 +146,19 @@ final class JsonApiValidationErrors {
   }
 
   private static @Nullable List<String> springPath(String field) {
+    if (field.startsWith(".") || field.startsWith("[")) {
+      return null;
+    }
     List<String> segments = new ArrayList<>();
     var matcher = SPRING_SEGMENT.matcher(field);
     int end = 0;
     while (matcher.find() && matcher.start() == end) {
-      String property = matcher.group(1);
-      if (end == 0 && (property == null || field.startsWith("."))) {
-        break;
-      }
       end = matcher.end();
       if (end < field.length() && field.charAt(end) != '.' && field.charAt(end) != '[') {
         break;
       }
       // Only canonical bracketed indices are accepted. Keys and other syntax stop traversal.
+      String property = matcher.group(1);
       segments.add(property != null ? property : matcher.group(2));
     }
     return segments.isEmpty() ? null : segments;

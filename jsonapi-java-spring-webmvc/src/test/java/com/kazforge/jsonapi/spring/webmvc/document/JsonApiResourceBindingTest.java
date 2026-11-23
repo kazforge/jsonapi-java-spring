@@ -833,13 +833,14 @@ class JsonApiResourceBindingTest {
                       readBody =
                           new String(
                               ((InputStream) args[0]).readAllBytes(), StandardCharsets.UTF_8);
-                      var context = (DocumentReadContext) args[1];
-                      assertEquals(PrimaryDataKind.RESOURCE, context.primaryDataKind());
+                      var readContext = (DocumentReadContext) args[1];
+                      assertEquals(PrimaryDataKind.RESOURCE, readContext.primaryDataKind());
                       assertEquals(
                           DocumentUsage.UPDATE_REQUEST,
-                          context.validationContext().documentUsage());
+                          readContext.validationContext().documentUsage());
                       assertEquals(
-                          PATCH_IDENTITY, context.validationContext().expectedEndpointIdentity());
+                          PATCH_IDENTITY,
+                          readContext.validationContext().expectedEndpointIdentity());
                       return patchDocument;
                     }
                     if (method.getName().equals("write") && args[0] instanceof JsonApiDocument) {
