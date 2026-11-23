@@ -6,11 +6,11 @@ description: JSON:API 1.1 HTTP integration for Spring Framework 7
 # Spring WebMVC
 
 `jsonapi-java-spring-webmvc` adds opt-in JSON:API 1.1 handling to Spring MVC
-controllers: media negotiation, request/query context, resource DTO binding and
+controllers: media negotiation, request/query context, resource DTO binding, request-body validation and
 protocol errors. Ordinary MVC endpoints are unaffected.
 
 This is a companion to the framework-neutral
-[jsonapi-java guide](https://jsonapi.kazforge.com/core/0.4.0/). Spring and Core have
+[jsonapi-java guide](https://jsonapi.kazforge.com/core/0.5.0/). Spring and Core have
 **independent release trains**. Your application still owns controllers,
 persistence, authorization and query execution.
 
@@ -50,13 +50,13 @@ For the verified Jackson 3 setup, also add this line to your
 `dependencies` block:
 
 ```kotlin
-implementation("com.kazforge:jsonapi-java-jackson3:0.4.0")
+implementation("com.kazforge:jsonapi-java-jackson3:0.5.0")
 ```
 
 The Jackson 3 version above is this Spring release's verified Core baseline.
 Update it only when Spring deliberately adopts a newer Core baseline;
 Spring and Core are independently versioned. See the
-[Core getting-started guide](https://jsonapi.kazforge.com/core/0.4.0/getting-started/)
+[Core getting-started guide](https://jsonapi.kazforge.com/core/0.5.0/getting-started/)
 for the neutral runtime setup. No separate Spring BOM or Boot starter is published.
 
 **Next:** [Register the WebMVC adapter](webmvc.md#register-the-adapter) and
