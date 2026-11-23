@@ -3,7 +3,6 @@ package com.kazforge.jsonapi.spring.webmvc.error;
 import com.kazforge.jsonapi.api.JsonApi;
 import com.kazforge.jsonapi.core.model.ErrorObject;
 import com.kazforge.jsonapi.core.model.ErrorSource;
-import com.kazforge.jsonapi.core.model.JsonApiDocument;
 import com.kazforge.jsonapi.core.validation.ValidationRuleCode;
 import com.kazforge.jsonapi.diagnostic.JsonApiDocumentReadException;
 import com.kazforge.jsonapi.diagnostic.JsonApiMappingException;
@@ -29,7 +28,10 @@ import org.springframework.web.servlet.ModelAndView;
 /**
  * Safe protocol failure translation for opted-in handlers, including interceptor failures before
  * request context exists. Register before Spring's default resolvers to handle negotiation errors.
- * Application exception handlers may precede this resolver. Unrecognized failures are untouched.
+ * Matched create and typed PATCH body validation failures produce safe field and object errors with
+ * source pointers where proven. Other validation failures retain the generic protocol error. Order
+ * application exception handlers before this resolver to override the default response.
+ * Unrecognized failures are untouched.
  */
 public final class JsonApiProtocolExceptionResolver implements HandlerExceptionResolver {
   private final JsonApiDocumentResponseWriter writer;
@@ -47,12 +49,12 @@ public final class JsonApiProtocolExceptionResolver implements HandlerExceptionR
     if (!JsonApiHandlers.isEndpoint(handler)) {
       return null;
     }
-    ProtocolFailure error = classify(exception);
+    ProtocolFailure error = classify(request, exception);
     if (error == null) {
       return null;
     }
     try {
-      writer.write(JsonApiDocument.withError(error.error()), error.status().value(), response);
+      writer.write(error.body().toDocument(), error.status().value(), response);
     } catch (IOException transportFailure) {
       // Do not retry writes or delegate a partially written response to another renderer.
       if (!response.isCommitted()) {
@@ -64,12 +66,16 @@ public final class JsonApiProtocolExceptionResolver implements HandlerExceptionR
     return new ModelAndView();
   }
 
-  private static @Nullable ProtocolFailure classify(Exception exception) {
+  private static @Nullable ProtocolFailure classify(
+      HttpServletRequest request, Exception exception) {
     return switch (exception) {
       case JsonApiQueryException query -> queryFailure(query);
       case JsonApiDocumentReadException read -> documentFailure(read);
       case HttpMessageNotReadableException read -> unreadableFailure(read);
-      case MethodArgumentNotValidException ignored -> failure(ProtocolError.INVALID_REQUEST);
+      case MethodArgumentNotValidException invalidBody ->
+          JsonApiErrorResponse.fromValidation(request, invalidBody)
+              .map(body -> new ProtocolFailure(HttpStatus.BAD_REQUEST, body))
+              .orElseGet(() -> failure(ProtocolError.INVALID_REQUEST));
       case HttpMessageNotWritableException ignored ->
           failure(ProtocolError.RESPONSE_SERIALIZATION_FAILED);
       case HttpMessageConversionException ignored -> failure(ProtocolError.RESOURCE_BINDING_FAILED);
@@ -134,5 +140,9 @@ public final class JsonApiProtocolExceptionResolver implements HandlerExceptionR
         error.status(), error.error(ErrorSource.builder().header(header).build()));
   }
 
-  private record ProtocolFailure(HttpStatus status, ErrorObject error) {}
+  private record ProtocolFailure(HttpStatus status, JsonApiErrorResponse body) {
+    private ProtocolFailure(HttpStatus status, ErrorObject error) {
+      this(status, JsonApiErrorResponse.of(error));
+    }
+  }
 }

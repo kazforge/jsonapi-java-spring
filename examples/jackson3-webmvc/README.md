@@ -1,7 +1,7 @@
 # Jackson 3 WebMVC consumer
 
 A non-published, stateless Spring Framework application configuration using the local
-WebMVC adapter and Maven Central's `com.kazforge:jsonapi-java-jackson3:0.4.0`.
+WebMVC adapter and Maven Central's `com.kazforge:jsonapi-java-jackson3:0.5.0`.
 It uses Java 21, the catalog's current Spring 7.0 patch, and the runtime's published
 Jackson 3.1.7 dependency baseline. No Boot or servlet container is required to run the tests.
 
@@ -39,8 +39,8 @@ echoes plain `Article` JSON on PATCH.
 ## Updating an article
 
 The same application configuration registers route-derived identity resolution and a
-Spring validator for `ArticlePatch`. The controller applies the bound changes to the
-sample article and returns its JSON:API representation:
+Jakarta validator with `PatchPresenceValueExtractor`. The controller applies the bound
+changes to the sample article and returns its JSON:API representation:
 
 ```http
 PATCH /articles/42

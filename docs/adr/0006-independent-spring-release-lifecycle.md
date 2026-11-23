@@ -13,7 +13,8 @@ coupling version numbers to Core.
 
 Use one root version, starting at 0.1.0, for the Spring product. Only
 `com.kazforge:jsonapi-java-spring-webmvc` is published; the Jackson 3 example is not.
-Core API/query 0.4.0 is the supported dependency baseline, not Spring's release number.
+The Core API/query version in the catalog is the supported dependency baseline, not Spring's
+release number.
 
 Conventional Commits drive releases: `feat` increments minor; `fix`, `perf` and
 non-breaking `revert` increment patch. Internal-only changes do not trigger releases.

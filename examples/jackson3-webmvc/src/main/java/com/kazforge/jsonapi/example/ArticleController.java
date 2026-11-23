@@ -3,9 +3,9 @@ package com.kazforge.jsonapi.example;
 import com.kazforge.jsonapi.core.model.ResourceIdentifier;
 import com.kazforge.jsonapi.patch.PatchPresence;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,7 +19,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @JsonApiEndpoint
 public final class ArticleController {
   @PostMapping("/articles")
-  public ResponseEntity<Article> create(@RequestBody Article input) {
+  public ResponseEntity<Article> create(@Valid @RequestBody Article input) {
     String id = input.id() == null ? "42" : input.id();
     return ResponseEntity.created(
             UriComponentsBuilder.fromPath("/articles").pathSegment(id).build().encode().toUri())
@@ -28,7 +28,7 @@ public final class ArticleController {
 
   /** Applies changes to the sample snapshot; a real application would load and persist it. */
   @PatchMapping("/articles/{id}")
-  public Article update(@RequestBody @Validated ArticlePatch input) {
+  public Article update(@Valid @RequestBody ArticlePatch input) {
     Article current = one(input.id());
     return new Article(
         input.id(),

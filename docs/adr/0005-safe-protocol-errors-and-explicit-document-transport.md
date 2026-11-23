@@ -17,6 +17,16 @@ query and document-read failures. Use fixed titles and diagnostic codes, retaini
 query parameter attribution but never exception messages. Classify these as 406/415 or 400;
 do not classify arbitrary mapping, validation or application failures as request errors.
 
+For Spring request-body validation on a successfully bound create or typed resource PATCH DTO,
+translate `MethodArgumentNotValidException` into safe field and object errors. Attribution is
+limited to the bound target in the current dispatch. Translate Jakarta Validation nodes to
+logical property names and proven indices, then use the same binding operation's Core source
+snapshot to select an existing pointer or meaningful ancestor. Never infer wire names, rebind
+the request, or expose validation messages or rejected values. Other Spring validation failures
+on opted-in handlers keep the generic protocol fallback. Generated validation errors omit
+per-error `status`, so a preceding application exception handler can reuse the same body and
+override only the default HTTP 400 through the error response seam in ADR 0008.
+
 Share a neutral document response writer with explicit advanced callers. It accepts a
 caller-supplied `JsonApi` runtime and public `JsonApiDocument`, not a new Spring document model.
 Raw request reads require explicit `DocumentReadContext` through the runtime; no generic raw

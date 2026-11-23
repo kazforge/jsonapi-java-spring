@@ -130,6 +130,21 @@ class ConsumerIntegrationTest {
   }
 
   @Test
+  void anOmittedRequiredAttributeHasNoFabricatedSource() throws Exception {
+    var result =
+        mvc.perform(
+                post("/articles")
+                    .contentType(JSON_API)
+                    .content("{\"data\":{\"type\":\"articles\"}}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().contentType(JSON_API))
+            .andReturn();
+    JsonNode error = body(result).at("/errors/0");
+    assertEquals("INVALID_FIELD", error.path("code").asString());
+    assertFalse(error.has("source"));
+  }
+
+  @Test
   void leavesUnmarkedEndpointsToSpring() throws Exception {
     JsonNode ordinary =
         body(

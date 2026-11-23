@@ -3,7 +3,6 @@ package com.kazforge.jsonapi.example;
 import com.kazforge.jsonapi.api.JsonApi;
 import com.kazforge.jsonapi.core.validation.EndpointIdentity;
 import com.kazforge.jsonapi.jackson3.JsonApiJackson3;
-import com.kazforge.jsonapi.patch.PatchPresence;
 import com.kazforge.jsonapi.spring.webmvc.document.JsonApiResourceHttpMessageConverter;
 import com.kazforge.jsonapi.spring.webmvc.error.JsonApiErrorHttpMessageConverter;
 import com.kazforge.jsonapi.spring.webmvc.error.JsonApiProtocolExceptionResolver;
@@ -11,13 +10,13 @@ import com.kazforge.jsonapi.spring.webmvc.media.JsonApiMediaNegotiationAdvice;
 import com.kazforge.jsonapi.spring.webmvc.media.JsonApiMediaNegotiationInterceptor;
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContextArgumentResolver;
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContextInterceptor;
+import com.kazforge.jsonapi.spring.webmvc.validation.PatchPresenceValueExtractor;
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.HttpMessageConverters;
-import org.springframework.validation.Errors;
-import org.springframework.validation.Validator;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.HandlerMapping;
@@ -74,22 +73,11 @@ public class ConsumerConfiguration implements WebMvcConfigurer {
   }
 
   @Override
-  public Validator getValidator() {
-    return new Validator() {
-      @Override
-      public boolean supports(Class<?> type) {
-        return type == ArticlePatch.class;
-      }
-
-      @Override
-      public void validate(Object target, Errors errors) {
-        if (((ArticlePatch) target).title() instanceof PatchPresence.Present<String>(var title)
-            && title != null
-            && title.isBlank()) {
-          errors.rejectValue("title", "blank", "A supplied title must be nonblank or null");
-        }
-      }
-    };
+  public LocalValidatorFactoryBean getValidator() {
+    var validator = new LocalValidatorFactoryBean();
+    validator.setConfigurationInitializer(
+        configuration -> configuration.addValueExtractor(new PatchPresenceValueExtractor()));
+    return validator;
   }
 
   @Override
@@ -105,6 +93,7 @@ public class ConsumerConfiguration implements WebMvcConfigurer {
 
   @Override
   public void extendHandlerExceptionResolvers(List<HandlerExceptionResolver> resolvers) {
-    resolvers.addFirst(new JsonApiProtocolExceptionResolver(runtime));
+    // After Spring's @ExceptionHandler resolver, but before its other defaults.
+    resolvers.add(1, new JsonApiProtocolExceptionResolver(runtime));
   }
 }
