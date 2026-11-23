@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/kazforge/jsonapi-java-spring/compare/v0.3.0...v0.4.0) (2026-11-23)
+
+
+### Features
+
+* **webmvc:** translate resource body validation errors ([adda9ec](https://github.com/kazforge/jsonapi-java-spring/commit/adda9ec7f7ed3da930bb58957960dffa56802378))
+
 ## [0.3.0](https://github.com/kazforge/jsonapi-java-spring/compare/v0.2.0...v0.3.0) (2026-11-16)
 
 
