@@ -13,8 +13,10 @@ import com.kazforge.jsonapi.diagnostic.MappingDiagnostic;
 import com.kazforge.jsonapi.document.DocumentEnvelope;
 import com.kazforge.jsonapi.document.DocumentReadContext;
 import com.kazforge.jsonapi.document.PrimaryDataKind;
+import com.kazforge.jsonapi.mapping.BoundResource;
 import com.kazforge.jsonapi.patch.PatchCommand;
 import com.kazforge.jsonapi.spring.webmvc.error.JsonApiErrorResponse;
+import com.kazforge.jsonapi.spring.webmvc.internal.JsonApiBodyBinding;
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -54,6 +56,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * requires request-scoped endpoint identity through the constructor callback. Neither path applies
  * mutations or independently binds included resources. Relationship-linkage handlers are not
  * claimed.
+ *
+ * <p>Create and typed PATCH require a runtime supporting Core's source-aware operations. The bound
+ * DTO is returned directly to Spring; only the current dispatch retains its attribution for
+ * request-body validation errors. A failed binding is not retried.
  */
 public final class JsonApiResourceHttpMessageConverter
     implements GenericHttpMessageConverter<Object> {
@@ -110,13 +116,18 @@ public final class JsonApiResourceHttpMessageConverter
   public Object read(
       @Nullable Type type, @Nullable Class<?> contextClass, HttpInputMessage inputMessage)
       throws IOException {
-    JsonApiRequestContext context = currentContext();
+    HttpServletRequest request = currentServletRequest();
+    JsonApiRequestContext context = request == null ? null : JsonApiRequestContext.find(request);
     boolean patch = context != null && HttpMethod.PATCH.equals(context.method());
+    if (request != null) {
+      JsonApiBodyBinding.clear(request);
+    }
     try {
-      if (patch) {
-        return readPatch(type, contextClass, inputMessage);
+      if (patch && request != null) {
+        return readPatch(type, contextClass, inputMessage, request, context);
       }
-      return readCreate(type, contextClass, inputMessage);
+      return JsonApiBodyBinding.remember(
+          request, context, readCreate(type, contextClass, inputMessage));
     } catch (JsonApiDocumentReadException failure) {
       throw new HttpMessageNotReadableException(
           "Invalid JSON:API resource document", failure, inputMessage);
@@ -136,7 +147,7 @@ public final class JsonApiResourceHttpMessageConverter
     }
   }
 
-  private Object readCreate(
+  private BoundResource<?> readCreate(
       @Nullable Type type, @Nullable Class<?> contextClass, HttpInputMessage inputMessage)
       throws IOException {
     Type targetType = resolveTargetType(type, contextClass);
@@ -153,12 +164,16 @@ public final class JsonApiResourceHttpMessageConverter
     }
     InputStream body = inputMessage.getBody();
     return targetType instanceof Class<?> clazz
-        ? runtime.resources().readCreate(body, clazz)
-        : runtime.resources().readCreate(body, targetType);
+        ? runtime.resources().readCreateWithSources(body, clazz)
+        : runtime.resources().readCreateWithSources(body, targetType);
   }
 
   private Object readPatch(
-      @Nullable Type type, @Nullable Class<?> contextClass, HttpInputMessage inputMessage)
+      @Nullable Type type,
+      @Nullable Class<?> contextClass,
+      HttpInputMessage inputMessage,
+      HttpServletRequest request,
+      @Nullable JsonApiRequestContext context)
       throws IOException {
     Type targetType = resolveTargetType(type, contextClass);
     if (targetType == null
@@ -176,11 +191,9 @@ public final class JsonApiResourceHttpMessageConverter
         throw new IllegalStateException("PatchCommand requires a single resource type");
       }
     }
-    ServletRequestAttributes attributes =
-        (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
     EndpointIdentity identity =
         Objects.requireNonNull(
-            endpointIdentity.apply(attributes.getRequest()), "PATCH endpoint identity is required");
+            endpointIdentity.apply(request), "PATCH endpoint identity is required");
     ValidationContext validation =
         ValidationContext.defaults()
             .withDocumentUsage(DocumentUsage.UPDATE_REQUEST)
@@ -193,7 +206,8 @@ public final class JsonApiResourceHttpMessageConverter
                 new DocumentReadContext(validation, PrimaryDataKind.RESOURCE));
     return command
         ? runtime.patches().bindCommand(document, bindingType)
-        : runtime.patches().bindPatch(document, bindingType);
+        : JsonApiBodyBinding.remember(
+            request, context, runtime.patches().bindPatchWithSources(document, bindingType));
   }
 
   private static boolean hasWildcard(Type type) {
@@ -366,11 +380,14 @@ public final class JsonApiResourceHttpMessageConverter
   }
 
   private static @Nullable JsonApiRequestContext currentContext() {
-    if (!(RequestContextHolder.getRequestAttributes()
-        instanceof ServletRequestAttributes attributes)) {
-      return null;
-    }
-    HttpServletRequest request = attributes.getRequest();
-    return JsonApiRequestContext.find(request);
+    HttpServletRequest request = currentServletRequest();
+    return request == null ? null : JsonApiRequestContext.find(request);
+  }
+
+  private static @Nullable HttpServletRequest currentServletRequest() {
+    return RequestContextHolder.getRequestAttributes()
+            instanceof ServletRequestAttributes attributes
+        ? attributes.getRequest()
+        : null;
   }
 }

@@ -21,8 +21,11 @@ dependencies {
     api(libs.jsonapi.query)
     api(libs.spring.webmvc)
     api(libs.servlet.api)
+    api(libs.validation.api)
     testImplementation(libs.spring.test)
     testImplementation(libs.hamcrest)
+    testRuntimeOnly(libs.hibernate.validator)
+    testRuntimeOnly(libs.expressly)
     if (springTestVersion == "current") {
         testImplementation(platform(libs.spring.current.bom))
     }

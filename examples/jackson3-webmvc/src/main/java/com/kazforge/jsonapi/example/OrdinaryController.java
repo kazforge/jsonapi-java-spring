@@ -1,5 +1,6 @@
 package com.kazforge.jsonapi.example;
 
+import jakarta.validation.Valid;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -15,7 +16,7 @@ public final class OrdinaryController {
   }
 
   @PatchMapping("/ordinary")
-  public Article echo(@RequestBody Article input) {
+  public Article echo(@Valid @RequestBody Article input) {
     return input;
   }
 }

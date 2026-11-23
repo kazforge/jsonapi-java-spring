@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.kazforge.jsonapi.api.JsonApi;
 import com.kazforge.jsonapi.api.JsonApiDocuments;
+import com.kazforge.jsonapi.api.JsonApiPatches;
 import com.kazforge.jsonapi.api.JsonApiResources;
 import com.kazforge.jsonapi.api.ResourceWriteOptions;
 import com.kazforge.jsonapi.core.model.JsonApiDocument;
@@ -13,16 +14,27 @@ import com.kazforge.jsonapi.core.model.JsonApiObject;
 import com.kazforge.jsonapi.core.model.Link;
 import com.kazforge.jsonapi.core.model.Links;
 import com.kazforge.jsonapi.core.model.Meta;
+import com.kazforge.jsonapi.core.validation.DocumentUsage;
+import com.kazforge.jsonapi.core.validation.EndpointIdentity;
 import com.kazforge.jsonapi.core.validation.PrimaryDataContext;
 import com.kazforge.jsonapi.diagnostic.CodecFailureCategory;
 import com.kazforge.jsonapi.diagnostic.JsonApiDocumentReadException;
 import com.kazforge.jsonapi.diagnostic.JsonApiMappingException;
 import com.kazforge.jsonapi.diagnostic.MappingDiagnostic;
+import com.kazforge.jsonapi.diagnostic.MappingLocation;
 import com.kazforge.jsonapi.diagnostic.SourceLocation;
+import com.kazforge.jsonapi.document.DocumentReadContext;
+import com.kazforge.jsonapi.document.PrimaryDataKind;
+import com.kazforge.jsonapi.mapping.BindingSource;
+import com.kazforge.jsonapi.mapping.BoundResource;
+import com.kazforge.jsonapi.patch.PatchCommand;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
+import com.kazforge.jsonapi.spring.webmvc.error.JsonApiErrorResponse;
 import com.kazforge.jsonapi.spring.webmvc.error.JsonApiProtocolExceptionResolver;
+import com.kazforge.jsonapi.spring.webmvc.internal.JsonApiBodyBinding;
 import com.kazforge.jsonapi.spring.webmvc.media.JsonApiMediaNegotiationAdvice;
 import com.kazforge.jsonapi.spring.webmvc.media.JsonApiMediaNegotiationInterceptor;
+import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContext;
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContextArgumentResolver;
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContextInterceptor;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,6 +47,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -55,7 +68,9 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -66,6 +81,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @NullMarked
 class JsonApiResourceBindingTest {
+  private static final EndpointIdentity PATCH_IDENTITY = new EndpointIdentity("articles", "42");
+  private static final String JSON_API = "application/vnd.api+json";
   private Recording runtime;
   private AnnotationConfigWebApplicationContext context;
   private MockMvc mvc;
@@ -114,6 +131,17 @@ class JsonApiResourceBindingTest {
             .andExpect(status().isBadRequest())
             .andReturn();
     assertFalse(invalid.getResponse().getContentAsString().contains("invalid"));
+    var errors = Objects.requireNonNull(runtime.error.errors());
+    assertEquals(
+        List.of("INVALID_FIELD", "INVALID_RESOURCE"), errors.stream().map(e -> e.code()).toList());
+    assertEquals(
+        "/data/attributes/display~1name",
+        Objects.requireNonNull(errors.getFirst().source()).pointer());
+    assertEquals("/data", Objects.requireNonNull(errors.getLast().source()).pointer());
+    var failure =
+        assertInstanceOf(MethodArgumentNotValidException.class, invalid.getResolvedException());
+    assertNull(
+        JsonApiBodyBinding.find(invalid.getRequest(), failure.getBindingResult().getTarget()));
     assertEquals(2, runtime.reads);
     assertEquals(0, Controller.invalidCalls);
 
@@ -176,6 +204,66 @@ class JsonApiResourceBindingTest {
     ParameterizedType delegated = assertInstanceOf(ParameterizedType.class, runtime.readType);
     assertEquals(GenericDto.class, delegated.getRawType());
     assertArrayEquals(new Type[] {String.class}, delegated.getActualTypeArguments());
+  }
+
+  @Test
+  void patchBindsTheValidatedDocumentOnceAndKeepsTheGenericTarget() throws Exception {
+    mvc.perform(patch("/generic").contentType(JSON_API).content("patch-body"))
+        .andExpect(status().isOk());
+    assertEquals(List.of("read", "bindPatchWithSources"), runtime.patchOperations);
+    assertEquals("patch-body", runtime.readBody);
+    ParameterizedType delegated = assertInstanceOf(ParameterizedType.class, runtime.readType);
+    assertEquals(GenericDto.class, delegated.getRawType());
+    assertArrayEquals(new Type[] {String.class}, delegated.getActualTypeArguments());
+    assertEquals(new GenericDto<>("resolved-patch"), runtime.writtenValues.getLast());
+
+    runtime.patchOperations.clear();
+    mvc.perform(patch("/command").contentType(JSON_API).content("command-body"))
+        .andExpect(status().isNoContent());
+    assertEquals(List.of("read", "bindCommand"), runtime.patchOperations);
+    assertEquals(Dto.class, runtime.readType);
+  }
+
+  @Test
+  void unsupportedSourceAwareOperationsFailClosedWithoutRetry() throws Exception {
+    runtime.unsupportedSources = true;
+    mvc.perform(post("/resources").contentType(JSON_API).content("create"))
+        .andExpect(status().isInternalServerError());
+    assertEquals(1, runtime.reads);
+    assertEquals("RESOURCE_BINDING_FAILED", errorCode(runtime.error));
+
+    mvc.perform(patch("/generic").contentType(JSON_API).content("patch"))
+        .andExpect(status().isInternalServerError());
+    assertEquals(List.of("read", "bindPatchWithSources"), runtime.patchOperations);
+    assertEquals("RESOURCE_BINDING_FAILED", errorCode(runtime.error));
+  }
+
+  @Test
+  void onlyTheSameBindingTargetInTheCurrentDispatchGetsSourceAwareErrors() throws Exception {
+    var invalid =
+        mvc.perform(post("/invalid").contentType(JSON_API).content("invalid"))
+            .andExpect(status().isBadRequest())
+            .andReturn();
+    var failure =
+        assertInstanceOf(MethodArgumentNotValidException.class, invalid.getResolvedException());
+    var target = assertInstanceOf(Dto.class, failure.getBindingResult().getTarget());
+    var request = invalid.getRequest();
+    var handler = Objects.requireNonNull(invalid.getHandler());
+    var response = new org.springframework.mock.web.MockHttpServletResponse();
+    var dispatches = new JsonApiRequestContextInterceptor();
+    var resolver = new JsonApiProtocolExceptionResolver(runtime.runtime);
+    dispatches.preHandle(request, response, handler);
+    var dispatch = JsonApiRequestContext.find(request);
+
+    JsonApiBodyBinding.remember(request, dispatch, new RecordedBinding<>(new Dto(target.name())));
+    assertTrue(JsonApiErrorResponse.fromValidation(request, failure).isEmpty());
+
+    JsonApiBodyBinding.remember(request, dispatch, new RecordedBinding<>(target));
+    assertTrue(JsonApiErrorResponse.fromValidation(request, failure).isPresent());
+    dispatches.preHandle(request, response, handler);
+    resolver.resolveException(request, response, handler, failure);
+    assertEquals("INVALID_REQUEST", errorCode(runtime.error));
+    assertEquals("400", Objects.requireNonNull(runtime.error.errors()).getFirst().status());
   }
 
   @Test
@@ -392,7 +480,8 @@ class JsonApiResourceBindingTest {
 
     @Override
     public void configureMessageConverters(HttpMessageConverters.ServerBuilder builder) {
-      builder.addCustomConverter(new JsonApiResourceHttpMessageConverter(recording.runtime));
+      builder.addCustomConverter(
+          new JsonApiResourceHttpMessageConverter(recording.runtime, request -> PATCH_IDENTITY));
       builder.addCustomConverter(new OrdinaryConverter());
       builder.addCustomConverter(new ArrayFallbackConverter());
     }
@@ -464,6 +553,12 @@ class JsonApiResourceBindingTest {
     @JsonApiEndpoint(primaryDataContext = PrimaryDataContext.RELATIONSHIP)
     Dto relationship(@RequestBody Dto dto) {
       return dto;
+    }
+
+    @PatchMapping("/command")
+    ResponseEntity<Void> command(@RequestBody PatchCommand<Dto> command) {
+      assertEquals("42", command.identity());
+      return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/one")
@@ -553,6 +648,11 @@ class JsonApiResourceBindingTest {
     GenericDto<T> create(@RequestBody GenericDto<T> value) {
       return value;
     }
+
+    @PatchMapping("/generic")
+    GenericDto<T> update(@RequestBody GenericDto<T> value) {
+      return value;
+    }
   }
 
   @JsonApiEndpoint
@@ -580,6 +680,7 @@ class JsonApiResourceBindingTest {
     @Override
     public void validate(Object target, Errors errors) {
       if (((Dto) target).name().equals("invalid")) {
+        errors.rejectValue("name", "private-code", "private error message");
         errors.reject("invalid", "invalid");
       }
     }
@@ -649,9 +750,11 @@ class JsonApiResourceBindingTest {
     final List<String> writes = new ArrayList<>();
     final List<Object> writtenValues = new ArrayList<>();
     final List<ResourceWriteOptions> options = new ArrayList<>();
+    final List<String> patchOperations = new ArrayList<>();
     int reads;
     boolean failRead;
     boolean failWrite;
+    boolean unsupportedSources;
     @Nullable MappingDiagnostic mappingDiagnostic;
     JsonApiDocument error =
         JsonApiDocument.withError(com.kazforge.jsonapi.core.model.ErrorObject.ofTitle("initial"));
@@ -659,7 +762,11 @@ class JsonApiResourceBindingTest {
     String readBody = "";
     final JsonApiResources resources;
     final JsonApiDocuments documents;
+    final JsonApiPatches patches;
     final JsonApi runtime;
+    final JsonApiDocument patchDocument =
+        JsonApiDocument.withError(
+            com.kazforge.jsonapi.core.model.ErrorObject.ofTitle("recorded document identity"));
 
     Recording() {
       resources =
@@ -669,8 +776,12 @@ class JsonApiResourceBindingTest {
                   new Class<?>[] {JsonApiResources.class},
                   (proxy, method, args) ->
                       switch (method.getName()) {
-                        case "readCreate" -> {
+                        case "readCreateWithSources" -> {
                           reads++;
+                          if (unsupportedSources) {
+                            throw new UnsupportedOperationException(
+                                "Unsupported source-aware read");
+                          }
                           if (mappingDiagnostic != null) {
                             throw new JsonApiMappingException(
                                 mappingDiagnostic, Dto.class, null, "private mapping details");
@@ -689,9 +800,9 @@ class JsonApiResourceBindingTest {
                                   ((InputStream) args[0]).readAllBytes(), StandardCharsets.UTF_8);
                           if (target instanceof ParameterizedType parameterized
                               && parameterized.getRawType() == GenericDto.class) {
-                            yield new GenericDto<>("resolved-generic");
+                            yield new RecordedBinding<>(new GenericDto<>("resolved-generic"));
                           }
-                          yield new Dto(readBody);
+                          yield new RecordedBinding<>(new Dto(readBody));
                         }
                         case "writeOne", "writeMany" -> {
                           writes.add(method.getName());
@@ -717,9 +828,43 @@ class JsonApiResourceBindingTest {
                   JsonApiDocuments.class.getClassLoader(),
                   new Class<?>[] {JsonApiDocuments.class},
                   (proxy, method, args) -> {
+                    if (method.getName().equals("read")) {
+                      patchOperations.add("read");
+                      readBody =
+                          new String(
+                              ((InputStream) args[0]).readAllBytes(), StandardCharsets.UTF_8);
+                      var context = (DocumentReadContext) args[1];
+                      assertEquals(PrimaryDataKind.RESOURCE, context.primaryDataKind());
+                      assertEquals(
+                          DocumentUsage.UPDATE_REQUEST,
+                          context.validationContext().documentUsage());
+                      assertEquals(
+                          PATCH_IDENTITY, context.validationContext().expectedEndpointIdentity());
+                      return patchDocument;
+                    }
                     if (method.getName().equals("write") && args[0] instanceof JsonApiDocument) {
                       error = (JsonApiDocument) args[0];
                       return "{\"errors\":[{\"title\":\"Safe binding error\"}]}";
+                    }
+                    throw new UnsupportedOperationException(method.getName());
+                  });
+      patches =
+          (JsonApiPatches)
+              Proxy.newProxyInstance(
+                  JsonApiPatches.class.getClassLoader(),
+                  new Class<?>[] {JsonApiPatches.class},
+                  (proxy, method, args) -> {
+                    patchOperations.add(method.getName());
+                    assertSame(patchDocument, args[0]);
+                    readType = (Type) args[1];
+                    if (method.getName().equals("bindPatchWithSources")) {
+                      if (unsupportedSources) {
+                        throw new UnsupportedOperationException("Unsupported source-aware bind");
+                      }
+                      return new RecordedBinding<>(new GenericDto<>("resolved-patch"));
+                    }
+                    if (method.getName().equals("bindCommand")) {
+                      return new PatchCommand<>(Dto.class, "42", List.of());
                     }
                     throw new UnsupportedOperationException(method.getName());
                   });
@@ -731,8 +876,24 @@ class JsonApiResourceBindingTest {
                   (proxy, method, args) -> {
                     if (method.getName().equals("resources")) return resources;
                     if (method.getName().equals("documents")) return documents;
+                    if (method.getName().equals("patches")) return patches;
                     throw new UnsupportedOperationException(method.getName());
                   });
+    }
+  }
+
+  private record RecordedBinding<T>(T resource) implements BoundResource<T> {
+    @Override
+    public BindingSource source(List<String> logicalPath) {
+      if (logicalPath.isEmpty()) {
+        return new BindingSource(BindingSource.Presence.PRESENT_VALUE, MappingLocation.of("data"));
+      }
+      if (logicalPath.equals(List.of("name"))) {
+        return new BindingSource(
+            BindingSource.Presence.PRESENT_VALUE,
+            MappingLocation.of("data", "attributes", "display/name"));
+      }
+      return new BindingSource(BindingSource.Presence.UNRESOLVED, null);
     }
   }
 }

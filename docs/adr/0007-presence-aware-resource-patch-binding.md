@@ -6,7 +6,7 @@ Date: 2026-10-21
 
 ## Context
 
-Core 0.4.0 exposes backend-neutral binding for typed PATCH DTOs and explicit commands through
+Core exposes backend-neutral binding for typed PATCH DTOs and explicit commands through
 `JsonApiPatches`. Its direct `readPatch` and `readCommand` operations cannot accept per-request
 endpoint identity. WebMVC resource updates must validate the document against the addressed
 resource without configuring request state on the application-lifetime runtime or depending on
@@ -24,9 +24,16 @@ servlet request. Missing identity fails closed rather than silently disabling co
 
 Read once through `JsonApi.documents().read` using resource decoding and a request-local
 `ValidationContext` selecting `UPDATE_REQUEST` and the expected endpoint identity. Then call
-`JsonApi.patches().bindPatch` or `bindCommand` on that validated document, without parsing or
-validating again. Core owns all document and PATCH semantics; the existing protocol resolver owns
-HTTP error translation.
+`JsonApi.patches().bindPatchWithSources` or `bindCommand` on that validated document, without
+parsing or validating again. For typed PATCH, Spring receives the bound DTO directly; the
+dispatch-scoped source snapshot supports error attribution as described in ADR 0005. Core owns
+document and PATCH semantics; the existing protocol resolver owns HTTP error translation.
+
+Applications can register the standard Jakarta `PatchPresenceValueExtractor` with their
+validator. An omitted wrapper emits nothing; a present wrapper emits its value, even null.
+Type-use constraints and cascading use the ordinary Bean Validation rules. Presence is not
+validation policy: class constraints can inspect it, and children of supplied atomic
+replacements still validate normally.
 
 ## Consequences
 

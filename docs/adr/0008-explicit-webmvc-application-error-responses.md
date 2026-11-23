@@ -18,6 +18,12 @@ the conventional error response. The immutable body holds Core `ErrorObject` val
 `DocumentEnvelope`; Spring owns the HTTP status and headers. Supplied error `status` members are
 preserved as-is and never inferred, populated or reconciled.
 
+`JsonApiErrorResponse.fromValidation` exposes the default safe, attributed validation body to
+application exception advice. It uses the same dispatch and target checks as the protocol
+resolver, and returns empty when the exception is not for a supported body binding. The
+generated errors omit `status`, allowing advice to select a different HTTP status without
+changing the error objects.
+
 An explicitly registered, write-only `JsonApiErrorHttpMessageConverter` checks the originally
 matched `@JsonApiEndpoint` handler, covering both resource and relationship endpoints as well as
 unannotated exception advice without requiring a parsed request context. Ordinary unmarked handlers
@@ -31,6 +37,6 @@ supplied.
 
 ## Consequences
 
-Controllers, application exception advice and future validation handlers share one error-emission
+Controllers, application exception advice and validation handling share one error-emission
 path without coupling the adapter to Jackson or an application exception hierarchy. The public
 addition is one record and one message converter, extending ADRs 0002 and 0005.

@@ -6,7 +6,7 @@ JSON:API semantics and runtimes; this repository owns Spring-specific integratio
 
 `jsonapi-java-spring-webmvc` owns JSON:API HTTP adaptation: it provides an opt-in
 `@JsonApiEndpoint` marker whose handlers get JSON:API 1.1 request and response media
-negotiation, operation-aware request/query context, and safe protocol error translation,
+negotiation, operation-aware request/query context, and safe protocol and body-validation errors,
 without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record durable decisions.
 
 ## Repository structure
@@ -16,7 +16,7 @@ without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record du
 | `settings.gradle.kts` | Module membership and dependency repositories. |
 | Root build | Build/quality orchestration and Sonar configuration. |
 | `build-logic` | Reusable formatting and Java library quality conventions. |
-| `jsonapi-java-spring-webmvc` | Neutral WebMVC integration: media negotiation, request/query context, resource DTO and presence-aware PATCH binding, protocol and application errors, and explicit document responses. |
+| `jsonapi-java-spring-webmvc` | Neutral WebMVC integration: media negotiation, request/query context, resource DTO and presence-aware PATCH binding, validation/protocol/application errors, and explicit document responses. |
 | `examples/jackson3-webmvc` | Non-published application wiring and real Jackson 3 consumer smoke tests. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
@@ -30,18 +30,19 @@ Dependencies resolve from Maven Central; the Plugin Portal also supplies build t
 Spring integration's core dependency boundary is released public neutral APIs, not
 core source or internal packages.
 
-The WebMVC module exposes `jsonapi-java-api:0.4.0`, `jsonapi-java-query:0.4.0`, Spring WebMVC, and
-the Servlet 6.1 API as API dependencies. Core 0.4.0 is the sole supported Core baseline.
-The adapter's production and test dependencies contain no Jackson runtime. The separate
-non-published consumer example depends on `jsonapi-java-jackson3:0.4.0` from Maven Central
-and the local Spring adapter. Jackson-specific construction belongs to that application,
-which supplies the neutral `JsonApi` bean. No source substitution or local Core build is used.
+The WebMVC module exposes `jsonapi-java-api:0.5.0`, `jsonapi-java-query:0.5.0`, Spring WebMVC,
+the Servlet 6.1 API, and the Jakarta Validation 3.1 API. Core 0.5.0 is the supported Core baseline.
+The adapter's production and test dependencies contain no Jackson runtime. A Jakarta Validation
+provider is used in tests and in the separate non-published consumer example, never in the adapter
+runtime. The example uses `jsonapi-java-jackson3:0.5.0` from Maven Central and supplies the neutral
+`JsonApi` runtime and the validator. No source substitution or local Core build is used.
 
 ## Request boundary
 
 `@JsonApiEndpoint` stays in `com.kazforge.jsonapi.spring.webmvc`; media negotiation lives
-in `.media`, request context in `.request`, protocol translation in `.error`, and explicit
-document response transport in `.document`. Production packages are null-marked.
+in `.media`, request context in `.request`, error translation in `.error`, explicit document
+response transport in `.document`, and the PATCH value extractor in `.validation`. Production
+packages are null-marked.
 
 Applications register `JsonApiMediaNegotiationInterceptor` before
 `JsonApiRequestContextInterceptor`, plus `JsonApiMediaNegotiationAdvice` as a bean and
@@ -61,8 +62,8 @@ URLs select `RELATIONSHIP`. Relationship POST/PATCH/DELETE must not be treated a
 create/update/delete solely from the verb.
 
 For a `RESOURCE` endpoint, POST request bodies bind once through the supplied runtime's
-`resources().readCreate`. DTO responses use `writeOne`; typed collections use `writeMany`, with
-the current request's representation selection passed per operation. `JsonApiResponse<T>` adds
+`resources().readCreateWithSources`. DTO responses use `writeOne`; typed collections use `writeMany`,
+with the current request's representation selection passed per operation. `JsonApiResponse<T>` adds
 optional top-level meta, links, or an explicit JSON:API object without replacing the application
 value. Unwrapped responses remain ordinary resource documents. Relationship endpoints and ordinary
 unmarked handlers are not claimed. Applications retain ownership of persistence, query execution,
@@ -70,11 +71,17 @@ authorization, route identity, and domain validation policy. Resource and collec
 non-null; plain null or bodyless returns remain Spring bodyless responses.
 
 For resource PATCH, the same converter binds `@RequestBody` typed PATCH DTOs through
-`JsonApi.patches().bindPatch`, or an explicit `PatchCommand<T>` through `bindCommand`. One neutral
-document read performs update validation using application-supplied, request-scoped endpoint identity
-before binding. Missing identity fails closed. Core owns presence and PATCH semantics; Spring owns
+`JsonApi.patches().bindPatchWithSources`, or an explicit `PatchCommand<T>` through `bindCommand`. One
+neutral document read performs update validation using application-supplied, request-scoped endpoint
+identity before binding. Missing identity fails closed. Core owns presence and PATCH semantics; Spring owns
 type resolution and HTTP adaptation. See [ADR 0007](adr/0007-presence-aware-resource-patch-binding.md)
 for the decision.
+
+The converter returns the DTO from Core directly to Spring, so controllers keep plain
+`@Valid @RequestBody` parameters. The source snapshot belongs to the current dispatch and is
+usable only for the same DTO instance. Redispatch does not inherit it. Custom runtimes must
+support the source-aware operations for conventional create and typed PATCH; a failed or
+unsupported operation does not fall back to another read or bind.
 
 Only the raw servlet query string is passed to the public query parser, with an absent string
 treated as empty. The parser owns decoding, syntax, ordering, immutable snapshots, and diagnostic
@@ -90,17 +97,36 @@ the protocol resolver translates them without treating exception messages as pub
 ## Protocol errors and document transport
 
 Register `JsonApiProtocolExceptionResolver` with a caller-supplied `JsonApi` runtime before
-Spring's default exception resolvers; application handlers may precede it. It checks the selected
+Spring's default status handling; application handlers may precede it. It checks the selected
 handler's endpoint marker because request context may not exist when parsing fails. Negotiation
 uses Spring's typed media exceptions, retaining default status handling without this resolver.
 
-Query, neutral document-read, known resource-input, and Spring validation failures produce 400
-responses; endpoint identity conflicts produce 409 and negotiation produces 406/415. Unknown supplied
-PATCH members are client-input failures; invalid PATCH DTO declarations remain server errors.
+Query, neutral document-read, known resource-input, and `MethodArgumentNotValidException` failures
+produce 400 responses; endpoint identity conflicts produce 409 and negotiation produces 406/415.
+Unknown supplied PATCH members are client-input failures; invalid PATCH DTO declarations remain server errors.
 Errors reuse core `ErrorObject`, `ErrorSource`, and
 `JsonApiDocument` values with fixed titles and diagnostic codes. Exception details and unverified
 document pointers are omitted. Unrelated mapping, configuration, and application exceptions are not
 classified as client errors.
+
+### Body validation
+
+Applications choose and configure their Jakarta Validation provider. Explicitly register
+`PatchPresenceValueExtractor` with that provider for PATCH type-use constraints and cascading:
+omitted wrappers emit no value, while supplied values (including explicit null) are validated.
+Class constraints can inspect presence. This rule does not exempt missing children of a supplied
+atomic replacement, and `included` resources are not independently validated as beans.
+
+For a `MethodArgumentNotValidException` on the matched create or typed PATCH body, the resolver
+emits one error per violation or binding error: `INVALID_FIELD` / “Invalid field value” or
+`INVALID_RESOURCE` / “Invalid resource”. It never includes Spring error codes, messages, or
+rejected values. Generated validation errors omit the optional per-error `status`; the default
+resolver still sends HTTP 400. The resolver prefers Jakarta path nodes and consults Core's source
+snapshot for exact document-relative pointers. Unknown paths may stop at an existing mapped
+ancestor; absent fields do not get guessed pointers. Root object errors can address `/data`.
+Relationships address linkage, not `included`. Other validation failures on opted-in handlers
+retain the generic `INVALID_REQUEST` error. Unmarked MVC and controller-owned `BindingResult`
+handling are unchanged.
 
 ### Application errors
 
@@ -111,6 +137,12 @@ optional `DocumentEnvelope`. `JsonApiErrorHttpMessageConverter` checks the origi
 annotated advice class or parsed query context—and delegates to `JsonApiDocumentResponseWriter`.
 Spring owns the HTTP status and headers; error object `status` members are neither inferred nor
 rewritten. See [ADR 0008](adr/0008-explicit-webmvc-application-error-responses.md).
+To override the default body-validation response (for example, with HTTP 422), place Spring's
+`@ExceptionHandler` resolver before `JsonApiProtocolExceptionResolver` and the protocol resolver
+before Spring's remaining defaults. Scope advice to the application's endpoints. Use
+`JsonApiErrorResponse.fromValidation(request, exception)` to reuse the same safe attributed body
+with a different status in `ResponseEntity`. If the factory returns empty, advice can rethrow
+the original exception to let the remaining resolvers handle it.
 
 ### Shared document transport
 

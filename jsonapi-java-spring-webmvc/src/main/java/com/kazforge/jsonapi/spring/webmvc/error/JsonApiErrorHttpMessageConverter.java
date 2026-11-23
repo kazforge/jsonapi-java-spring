@@ -1,14 +1,11 @@
 package com.kazforge.jsonapi.spring.webmvc.error;
 
 import com.kazforge.jsonapi.api.JsonApi;
-import com.kazforge.jsonapi.core.model.JsonApiDocument;
-import com.kazforge.jsonapi.document.DocumentEnvelope;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
 import com.kazforge.jsonapi.spring.webmvc.document.JsonApiDocumentResponseWriter;
 import com.kazforge.jsonapi.spring.webmvc.internal.JsonApiHandlers;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
@@ -70,17 +67,8 @@ public final class JsonApiErrorHttpMessageConverter
     if (!(outputMessage instanceof ServletServerHttpResponse output)) {
       throw new HttpMessageNotWritableException("JSON:API errors require a servlet response");
     }
-    DocumentEnvelope envelope = body.envelope();
-    JsonApiDocument document =
-        new JsonApiDocument(
-            null,
-            body.errors(),
-            envelope.meta(),
-            envelope.jsonapi(),
-            envelope.links(),
-            null,
-            Map.of());
-    writer.write(document, output.getServletResponse().getStatus(), output.getServletResponse());
+    writer.write(
+        body.toDocument(), output.getServletResponse().getStatus(), output.getServletResponse());
   }
 
   private static boolean isJsonApiHandler() {

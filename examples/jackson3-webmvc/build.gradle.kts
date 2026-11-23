@@ -7,6 +7,8 @@ dependencies {
     implementation(project(":jsonapi-java-spring-webmvc"))
     implementation(libs.jsonapi.jackson3)
     implementation(platform(libs.spring.current.bom))
+    runtimeOnly(libs.hibernate.validator)
+    runtimeOnly(libs.expressly)
     testImplementation(libs.spring.test)
     testImplementation(libs.hamcrest)
 }

@@ -2,12 +2,14 @@ package com.kazforge.jsonapi.example;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.kazforge.jsonapi.core.model.*;
 import com.kazforge.jsonapi.jackson3.JsonApiJackson3;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
 import com.kazforge.jsonapi.spring.webmvc.error.JsonApiErrorResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -17,6 +19,7 @@ import org.springframework.mock.web.MockServletContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import tools.jackson.databind.JsonNode;
@@ -61,6 +64,28 @@ class ApplicationErrorIntegrationTest {
               .andReturn();
       assertEquals("RESPONSE_SERIALIZATION_FAILED", body(invalid).at("/errors/0/code").asString());
       assertFalse(invalid.getResponse().getContentAsString().contains("private"));
+    }
+  }
+
+  @Test
+  void applicationAdviceCanOverrideBodyValidationWithAnExplicitStatus() throws Exception {
+    try (var context = application(false)) {
+      MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).build();
+      var result =
+          mvc.perform(
+                  post("/articles")
+                      .contentType(JSON_API)
+                      .content(
+                          """
+                          {"data":{"type":"articles","attributes":{"title":" "}}}
+                          """))
+              .andExpect(status().is(422))
+              .andExpect(content().contentType(JSON_API))
+              .andReturn();
+      JsonNode error = body(result).at("/errors/0");
+      assertEquals("INVALID_FIELD", error.path("code").asString());
+      assertEquals("/data/attributes/title", error.at("/source/pointer").asString());
+      assertFalse(error.has("status"));
     }
   }
 
@@ -167,7 +192,7 @@ class ApplicationErrorIntegrationTest {
     }
   }
 
-  @RestControllerAdvice(assignableTypes = ErrorController.class)
+  @RestControllerAdvice(assignableTypes = {ErrorController.class, ArticleController.class})
   static class ApplicationAdvice {
     @ExceptionHandler(ArticleLocked.class)
     @SuppressWarnings("unused") // Invoked by Spring's exception-handler resolver.
@@ -176,6 +201,14 @@ class ApplicationErrorIntegrationTest {
           .body(
               JsonApiErrorResponse.of(
                   ErrorObject.builder().code("ARTICLE_LOCKED").title("Article is locked").build()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ResponseEntity<JsonApiErrorResponse> invalidArticle(
+        HttpServletRequest request, MethodArgumentNotValidException failure)
+        throws MethodArgumentNotValidException {
+      var body = JsonApiErrorResponse.fromValidation(request, failure).orElseThrow(() -> failure);
+      return ResponseEntity.status(422).body(body);
     }
   }
 }
