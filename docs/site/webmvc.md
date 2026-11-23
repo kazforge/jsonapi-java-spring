@@ -31,8 +31,9 @@ integration hooks:
    `addCustomConverter`.
 3. Register `JsonApiRequestContextArgumentResolver` in
    `addArgumentResolvers`.
-4. Register `JsonApiProtocolExceptionResolver(runtime)` **before** Spring's
-   default exception resolvers in `extendHandlerExceptionResolvers`.
+4. Register `JsonApiProtocolExceptionResolver(runtime)` **after** Spring's
+   `@ExceptionHandler` resolver (so application advice can override errors),
+   but **before** the remaining default resolvers in `extendHandlerExceptionResolvers`.
 5. Expose `JsonApiMediaNegotiationAdvice` as a Spring bean.
 
 Here, `runtime` is the injected, application-supplied `JsonApi` bean.
@@ -42,13 +43,17 @@ with `addCustomConverter` so controllers and exception handlers can return
 For exact imports and registration code, see the release-matched
 `ConsumerConfiguration` in the example linked below.
 
+Create and typed resource PATCH binding require the source-aware Core 0.5.0 operations.
+Custom `JsonApi` runtimes must implement them; an unsupported operation fails as a server
+configuration error rather than silently retrying without source attribution.
+
 ## Opt in per controller
 
 Annotate JSON:API controllers or methods with `@JsonApiEndpoint`. Do **not**
 set `consumes` or `produces` on their request mappings: Spring evaluates
 those mapping conditions before the adapter's JSON:API media negotiation.
 
-The example's `ArticleController` uses normal `@RequestBody` DTOs,
+The example's `ArticleController` uses normal `@Valid @RequestBody` DTOs,
 `ResponseEntity` and `List<Article>` responses. Its POST handler accepts:
 
 ```http
@@ -71,7 +76,7 @@ release-matched example:
 
 <!-- x-release-please-start-version -->
 
-[Tested Jackson 3 WebMVC consumer](https://github.com/kazforge/jsonapi-java-spring/tree/v0.3.0/examples/jackson3-webmvc)
+[Tested Jackson 3 WebMVC consumer](https://github.com/kazforge/jsonapi-java-spring/tree/v0.4.0/examples/jackson3-webmvc)
 
 <!-- x-release-please-end -->
 
@@ -125,7 +130,7 @@ public record ArticlePatch(
 
 @JsonApiEndpoint
 @PatchMapping("/articles/{id}")
-public ResponseEntity<Void> update(@RequestBody ArticlePatch patch) {
+public ResponseEntity<Void> update(@Valid @RequestBody ArticlePatch patch) {
     articleService.update(patch.id(), patch.title());
     return ResponseEntity.noContent().build();
 }
@@ -163,12 +168,76 @@ Content-Type: application/vnd.api+json
 
 This binds `title` as `Present(null)`; omitting `title` binds `Omitted`. A body type/id that conflicts
 with the route produces 409. Invalid update documents and unknown supplied PATCH members produce
-400 through the protocol resolver. `@Validated`/`@Valid` use Spring's normal body validation.
+400 through the protocol resolver. `@Valid` enables Spring's normal body validation.
 
 Infrastructure handlers can explicitly declare `@RequestBody PatchCommand<Article>` instead.
 Its resource type must be fully resolved; raw commands, wildcards, unresolved generics, and bulk
 targets are configuration errors. Neither path applies mutations or projects `included` resources
 into application state. Dedicated relationship-linkage operations remain separate from resource PATCH.
 
+## Request-body validation
+
+Use `@Valid @RequestBody` (`jakarta.validation.Valid`) for JSON:API resource create
+and typed PATCH DTOs. The
+application supplies its Jakarta Validation provider; the adapter does not bundle one.
+On an opted-in controller, failed body validation defaults to HTTP **400** with
+`application/vnd.api+json` and safe `INVALID_FIELD` / `INVALID_RESOURCE` errors.
+Core 0.5.0 supplies request-local source attribution for logical Java property paths,
+including renamed and nested members. A pointer identifies a supplied member (or a
+proven supplied ancestor); when no safe location exists, the error omits its pointer.
+Rejected values, constraint messages and internal details are not returned.
+
+For type-use constraints or cascading on `PatchPresence<T>`, register the provided
+`PatchPresenceValueExtractor` with the application's validator. In a
+`WebMvcConfigurer` using `LocalValidatorFactoryBean`:
+
+```java
+import com.kazforge.jsonapi.spring.webmvc.validation.PatchPresenceValueExtractor;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+
+@Override
+public LocalValidatorFactoryBean getValidator() {
+    var validator = new LocalValidatorFactoryBean();
+    validator.setConfigurationInitializer(configuration ->
+        configuration.addValueExtractor(new PatchPresenceValueExtractor()));
+    return validator;
+}
+```
+
+For example, `PatchPresence<@NotBlank String>` validates supplied values, including
+explicit `null`; omitted members are not emitted by the extractor. Class-level
+constraints may still check the PATCH DTO, and a supplied atomic replacement
+does not exempt its missing nested members from validation.
+
+Application advice can override the default status while reusing the same attributed
+errors. Keep Spring's `@ExceptionHandler` resolver ahead of the JSON:API protocol
+resolver, as in the release-matched example:
+
+```java
+import com.kazforge.jsonapi.spring.webmvc.error.JsonApiErrorResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice(assignableTypes = ArticleController.class)
+class ValidationAdvice {
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ResponseEntity<JsonApiErrorResponse> invalid(
+        HttpServletRequest request, MethodArgumentNotValidException failure)
+        throws MethodArgumentNotValidException {
+        var errors = JsonApiErrorResponse.fromValidation(request, failure)
+            .orElseThrow(() -> failure);
+        return ResponseEntity.status(422).body(errors);
+    }
+}
+```
+
+`fromValidation` only applies to the same successfully bound create or typed PATCH
+body in the current dispatch. It returns empty for unrelated validation failures.
+Generated validation errors omit their optional per-error `status` member; the
+application owns the HTTP response status. Ordinary Spring MVC endpoints are unchanged.
+
 For resource annotations, detailed PATCH, relationships and query semantics, use the
-[framework-neutral jsonapi-java guide](https://jsonapi.kazforge.com/core/0.4.0/).
+[framework-neutral jsonapi-java guide](https://jsonapi.kazforge.com/core/0.5.0/).
