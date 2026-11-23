@@ -177,7 +177,8 @@ into application state. Dedicated relationship-linkage operations remain separat
 
 ## Request-body validation
 
-Use `@Valid @RequestBody` for JSON:API resource create and typed PATCH DTOs. The
+Use `@Valid @RequestBody` (`jakarta.validation.Valid`) for JSON:API resource create
+and typed PATCH DTOs. The
 application supplies its Jakarta Validation provider; the adapter does not bundle one.
 On an opted-in controller, failed body validation defaults to HTTP **400** with
 `application/vnd.api+json` and safe `INVALID_FIELD` / `INVALID_RESOURCE` errors.
@@ -237,5 +238,6 @@ class ValidationAdvice {
 body in the current dispatch. It returns empty for unrelated validation failures.
 Generated validation errors omit their optional per-error `status` member; the
 application owns the HTTP response status. Ordinary Spring MVC endpoints are unchanged.
+
 For resource annotations, detailed PATCH, relationships and query semantics, use the
 [framework-neutral jsonapi-java guide](https://jsonapi.kazforge.com/core/0.5.0/).
