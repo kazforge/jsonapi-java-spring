@@ -76,7 +76,7 @@ release-matched example:
 
 <!-- x-release-please-start-version -->
 
-[Tested Jackson 3 WebMVC consumer](https://github.com/kazforge/jsonapi-java-spring/tree/v0.4.0/examples/jackson3-webmvc)
+[Tested Jackson 3 WebMVC consumer](https://github.com/kazforge/jsonapi-java-spring/tree/v0.5.0/examples/jackson3-webmvc)
 
 <!-- x-release-please-end -->
 
