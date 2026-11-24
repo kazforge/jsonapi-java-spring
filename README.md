@@ -5,10 +5,10 @@ with its own repository and release train.
 
 The first module is `jsonapi-java-spring-webmvc`, a Jackson-neutral WebMVC adapter providing
 opt-in JSON:API media negotiation, operation-aware request/query context, safe protocol errors,
-and conventional resource DTO binding through public neutral contracts. Applications supply their
-`JsonApi` runtime; the adapter does not execute queries or select application/domain error
+and conventional resource DTO and relationship-linkage binding through public neutral contracts.
+Applications supply their `JsonApi` runtime; the adapter does not execute queries or select application/domain error
 semantics.
-The adapter targets Core 0.5.0. Configure `JsonApiResourceHttpMessageConverter` through Spring 7's
+The adapter targets Core 0.5.1. Configure `JsonApiResourceHttpMessageConverter` through Spring 7's
 `WebMvcConfigurer#configureMessageConverters(HttpMessageConverters.ServerBuilder)` to bind resource
 POST bodies and serialize DTOs; `JsonApiResponse<T>` adds optional top-level metadata, links, or a
 JSON:API object. Resource PATCH binds typed `PatchPresence<T>` DTO members, or an explicit
@@ -17,6 +17,9 @@ callback on the converter; validation compares the request's type/id against tha
 The converter uses the request's opted-in resource context and leaves relationship and ordinary
 MVC handlers alone. Controllers and application exception handlers can also return
 `ResponseEntity<JsonApiErrorResponse>` by registering `JsonApiErrorHttpMessageConverter(runtime)`.
+Relationship handlers use the separate `JsonApiRelationshipHttpMessageConverter`; their explicit
+to-one/null and typed identifier-list contracts are recorded in
+[ADR 0009](docs/adr/0009-operation-aware-relationship-linkage-binding.md).
 Spring modules consume released jsonapi-java artifacts from
 Maven Central, not a sibling source checkout.
 
@@ -38,7 +41,7 @@ The [release-owned Spring WebMVC guide](docs/site/index.md) covers consumer comp
 See [repository architecture and decisions](docs/README.md).
 
 The [Jackson 3 WebMVC consumer example](examples/jackson3-webmvc/README.md) demonstrates
-explicit application wiring and real-runtime HTTP integration against published Core 0.5.0.
+explicit application wiring and real-runtime HTTP integration against published Core 0.5.1.
 See [release readiness](docs/release.md) for the verified baseline and release boundary.
 
 See the [security policy](docs/security.md) for vulnerability triage and merge protection.
