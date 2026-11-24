@@ -1,7 +1,7 @@
 # Jackson 3 WebMVC consumer
 
 A non-published, stateless Spring Framework application configuration using the local
-WebMVC adapter and Maven Central's `com.kazforge:jsonapi-java-jackson3:0.5.0`.
+WebMVC adapter and Maven Central's `com.kazforge:jsonapi-java-jackson3:0.5.1`.
 It uses Java 21, the catalog's current Spring 7.0 patch, and the runtime's published
 Jackson 3.1.7 dependency baseline. No Boot or servlet container is required to run the tests.
 
@@ -61,6 +61,6 @@ and persist the article around the same presence-aware update logic.
 
 The context-backed MockMvc suite uses the real published runtime, not a recording
 substitute. It exercises the production configuration and controllers for create,
-read, update, validation, and ordinary MVC.
+read, update, validation, relationship linkage, and ordinary MVC.
 It checks representative `400`/`406`/`409`/`415` error documents. It is a consumer smoke test,
 not another Core conformance suite or Spring compatibility matrix.

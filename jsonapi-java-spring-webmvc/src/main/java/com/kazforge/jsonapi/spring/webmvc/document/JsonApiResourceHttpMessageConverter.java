@@ -27,15 +27,12 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.GenericTypeResolver;
 import org.springframework.core.ResolvableType;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpOutputMessage;
@@ -289,17 +286,7 @@ public final class JsonApiResourceHttpMessageConverter
       throw new HttpMessageNotWritableException(
           "Could not serialize JSON:API resource response", failure);
     }
-    if (servletResponse != null && servletResponse.isCommitted()) {
-      return;
-    }
-    if (servletResponse != null) {
-      resetUncommittedResponse(servletResponse);
-      servletResponse.setCharacterEncoding((String) null);
-      servletResponse.setHeader(HttpHeaders.CONTENT_TYPE, JSON_API.toString());
-    }
-    outputMessage.getHeaders().setContentType(JSON_API);
-    outputMessage.getHeaders().setContentLength(serialized.size());
-    outputMessage.getBody().write(serialized.toByteArray());
+    JsonApiBodyWriter.write(serialized, outputMessage, servletResponse);
   }
 
   private static boolean supportsBodyType(@Nullable Type type, @Nullable Class<?> valueClass) {
@@ -357,20 +344,6 @@ public final class JsonApiResourceHttpMessageConverter
           true;
       default -> false;
     };
-  }
-
-  private static void resetUncommittedResponse(HttpServletResponse response) {
-    if (response.isCommitted()) {
-      return;
-    }
-    int status = response.getStatus();
-    Map<String, List<String>> headers = new LinkedHashMap<>();
-    for (String name : response.getHeaderNames()) {
-      headers.put(name, List.copyOf(response.getHeaders(name)));
-    }
-    response.reset();
-    response.setStatus(status);
-    headers.forEach((name, values) -> values.forEach(value -> response.addHeader(name, value)));
   }
 
   private static @Nullable HttpServletResponse currentServletResponse() {

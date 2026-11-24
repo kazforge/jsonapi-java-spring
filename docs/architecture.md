@@ -16,7 +16,7 @@ without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record du
 | `settings.gradle.kts` | Module membership and dependency repositories. |
 | Root build | Build/quality orchestration and Sonar configuration. |
 | `build-logic` | Reusable formatting and Java library quality conventions. |
-| `jsonapi-java-spring-webmvc` | Neutral WebMVC integration: media negotiation, request/query context, resource DTO and presence-aware PATCH binding, validation/protocol/application errors, and explicit document responses. |
+| `jsonapi-java-spring-webmvc` | Neutral WebMVC integration: media negotiation, request/query context, resource DTO, presence-aware PATCH and relationship-linkage binding, validation/protocol/application errors, and explicit document responses. |
 | `examples/jackson3-webmvc` | Non-published application wiring and real Jackson 3 consumer smoke tests. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
@@ -30,11 +30,11 @@ Dependencies resolve from Maven Central; the Plugin Portal also supplies build t
 Spring integration's core dependency boundary is released public neutral APIs, not
 core source or internal packages.
 
-The WebMVC module exposes `jsonapi-java-api:0.5.0`, `jsonapi-java-query:0.5.0`, Spring WebMVC,
-the Servlet 6.1 API, and the Jakarta Validation 3.1 API. Core 0.5.0 is the supported Core baseline.
+The WebMVC module exposes `jsonapi-java-api:0.5.1`, `jsonapi-java-query:0.5.1`, Spring WebMVC,
+the Servlet 6.1 API, and the Jakarta Validation 3.1 API. Core 0.5.1 is the supported Core baseline.
 The adapter's production and test dependencies contain no Jackson runtime. A Jakarta Validation
 provider is used in tests and in the separate non-published consumer example, never in the adapter
-runtime. The example uses `jsonapi-java-jackson3:0.5.0` from Maven Central and supplies the neutral
+runtime. The example uses `jsonapi-java-jackson3:0.5.1` from Maven Central and supplies the neutral
 `JsonApi` runtime and the validator. No source substitution or local Core build is used.
 
 ## Request boundary
@@ -82,6 +82,34 @@ The converter returns the DTO from Core directly to Spring, so controllers keep 
 usable only for the same DTO instance. Redispatch does not inherit it. Custom runtimes must
 support the source-aware operations for conventional create and typed PATCH; a failed or
 unsupported operation does not fall back to another read or bind.
+
+For `RELATIONSHIP` endpoints, applications register `JsonApiRelationshipHttpMessageConverter`
+ahead of Spring defaults. Its controller signature determines cardinality, never the incoming JSON.
+To-one PATCH uses `@RequestBody JsonApiToOneRelationship`, a non-null value containing an identifier
+or null for a clear operation. This preserves Spring's required-body check: explicit `data:null`
+is a supplied value, while a missing body fails before invocation. To-many PATCH replacement,
+POST additions, and DELETE removals use `@RequestBody List<ResourceIdentifier>`. Empty lists
+remain empty. Raw, wildcard, unresolved, other target types, and unsupported method/cardinality
+combinations fail as endpoint configuration errors, not client errors.
+
+Each body is read once through `JsonApi.relationships().readToOne` or `readToMany`. The released
+Core runtime distinguishes absent data from explicit null, enforces identifier shape and validity,
+and rejects resource-only identifier members. No resource-create/update usage or endpoint-identity
+callback is involved. Core preserves identifier `id`, supported `lid`, and identifier meta.
+Neither this path nor its errors participate in source-aware resource DTO validation.
+
+Conventional linkage responses use `ResourceIdentifier`, `List<ResourceIdentifier>`, or
+`JsonApiToOneRelationship` for explicit null linkage. The converter delegates to the same neutral
+relationship facet for minimal linkage documents. Ordinary null remains bodyless, as do
+application-owned 204 responses. Status and headers stay application-owned. Invalid request
+documents and cardinality mismatches reuse the safe 400 resolver; runtime/configuration and
+response failures remain server errors. See [ADR 0009](adr/0009-operation-aware-relationship-linkage-binding.md).
+
+The linkage-only path cannot fulfill nonempty requested `include` paths and rejects them with
+the existing query diagnostic/error pipeline, before mutation binding or response serialization.
+Applications retain query support policy; advanced relationship responses use explicit document
+transport for links, meta, or included resources. That transport is not subject to the conventional
+converter's include restriction. There is no automatic DTO hydration or adapter-owned mutation.
 
 Only the raw servlet query string is passed to the public query parser, with an absent string
 treated as empty. The parser owns decoding, syntax, ordering, immutable snapshots, and diagnostic
@@ -148,12 +176,14 @@ the original exception to let the remaining resolvers handle it.
 
 `JsonApiDocumentResponseWriter` accepts a neutral document, explicit HTTP status and servlet
 response for advanced and error responses. Raw reads require an explicit `DocumentReadContext`
-through the runtime. Serialization delegates to `JsonApi.documents()` for documents and
-`JsonApi.resources()` for conventional DTOs, so Core's resource-write version default applies only
-to resource responses while explicit document envelopes are written as supplied.
+through the runtime. Serialization delegates to `JsonApi.documents()` for documents,
+`JsonApi.relationships()` for linkage and `JsonApi.resources()` for conventional DTOs, so Core's
+resource-write version default applies only to resource responses while explicit document
+envelopes are written as supplied.
 
-Both response paths serialize fully before writing. The DTO converter skips committed responses and
-resets uncommitted output mode while restoring status and headers; the advanced writer likewise
+All response paths serialize fully before writing. The resource and linkage converters share
+buffered output handling, skip committed responses and reset uncommitted output mode while
+restoring status and headers; the advanced writer likewise
 preserves headers. Failures are logged and produce a generic 500, or bodyless 500 if error
 serialization also fails. Transport I/O is not retried. Responses use bare
 `application/vnd.api+json` and merge `Vary: Accept`, even for 406 errors.

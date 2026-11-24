@@ -14,3 +14,4 @@ their replacements. See [Architecture](../architecture.md) for current structure
 | [0006 — Independent Spring release lifecycle](0006-independent-spring-release-lifecycle.md) | Accepted |
 | [0007 — Presence-aware resource PATCH binding](0007-presence-aware-resource-patch-binding.md) | Accepted |
 | [0008 — Explicit WebMVC application error responses](0008-explicit-webmvc-application-error-responses.md) | Accepted |
+| [0009 — Operation-aware relationship linkage binding](0009-operation-aware-relationship-linkage-binding.md) | Accepted |
