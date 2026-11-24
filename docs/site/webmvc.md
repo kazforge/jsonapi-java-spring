@@ -40,6 +40,9 @@ Here, `runtime` is the injected, application-supplied `JsonApi` bean.
 For application-owned error responses, also register `JsonApiErrorHttpMessageConverter(runtime)`
 with `addCustomConverter` so controllers and exception handlers can return
 `ResponseEntity<JsonApiErrorResponse>`.
+For [relationship-linkage endpoints](#relationship-linkage), register
+`JsonApiRelationshipHttpMessageConverter(runtime)` with `addCustomConverter` as well.
+Keep these custom converters ahead of Spring's defaults.
 For exact imports and registration code, see the release-matched
 `ConsumerConfiguration` in the example linked below.
 
@@ -173,7 +176,144 @@ with the route produces 409. Invalid update documents and unknown supplied PATCH
 Infrastructure handlers can explicitly declare `@RequestBody PatchCommand<Article>` instead.
 Its resource type must be fully resolved; raw commands, wildcards, unresolved generics, and bulk
 targets are configuration errors. Neither path applies mutations or projects `included` resources
-into application state. Dedicated relationship-linkage operations remain separate from resource PATCH.
+into application state. [Dedicated relationship-linkage operations](#relationship-linkage) remain separate from resource PATCH.
+
+## Relationship linkage
+
+Use `@JsonApiEndpoint(primaryDataContext = PrimaryDataContext.RELATIONSHIP)`
+on relationship-linkage handlers, with the relationship converter registered
+as described above. A relationship URL such as
+`/articles/42/relationships/author` returns identifiers, not full resources.
+A related-resource URL such as `/articles/42/author` remains an ordinary
+`@JsonApiEndpoint` resource handler.
+
+### To-one
+
+A to-one GET may return a `ResourceIdentifier` directly when the relationship
+is nonempty. Use `JsonApiToOneRelationship` for PATCH bodies and for responses
+that may represent empty linkage:
+
+```java
+import com.kazforge.jsonapi.core.validation.PrimaryDataContext;
+import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
+import com.kazforge.jsonapi.spring.webmvc.document.JsonApiToOneRelationship;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@JsonApiEndpoint(primaryDataContext = PrimaryDataContext.RELATIONSHIP)
+@RequestMapping("/articles/{id}/relationships/author")
+class AuthorRelationshipController {
+    private final ArticleService articles;
+
+    AuthorRelationshipController(ArticleService articles) {
+        this.articles = articles;
+    }
+
+    @GetMapping
+    JsonApiToOneRelationship get(@PathVariable String id) {
+        return new JsonApiToOneRelationship(articles.getAuthor(id));
+    }
+
+    @PatchMapping
+    ResponseEntity<Void> replace(
+            @PathVariable String id,
+            @RequestBody JsonApiToOneRelationship author) {
+        articles.setAuthor(id, author.identifier());
+        return ResponseEntity.noContent().build();
+    }
+}
+```
+
+Here and below, `ArticleService` is illustrative application code. Its author
+methods use a nullable `ResourceIdentifier`
+(`com.kazforge.jsonapi.core.model.ResourceIdentifier`).
+
+```http
+PATCH /articles/42/relationships/author
+Content-Type: application/vnd.api+json
+
+{"data":{"type":"people","id":"1"}}
+```
+
+The handler replaces the author and returns 204. Sending `{"data":null}`
+clears the author. An empty relationship GET returns 200 with `{"data":null}`;
+a plain Java null return remains bodyless. The wrapper distinguishes an
+explicit clear from a missing required request body, which is rejected.
+
+### To-many
+
+Use `List<ResourceIdentifier>` for both the response and the mutation body.
+The HTTP method determines the operation:
+
+| Method | Effect |
+| --- | --- |
+| GET | Read linkage |
+| PATCH | Replace all linkage |
+| POST | Add identifiers |
+| DELETE | Remove identifiers from the relationship |
+
+```java
+import com.kazforge.jsonapi.core.model.ResourceIdentifier;
+import java.util.List;
+
+// Methods on a RELATIONSHIP controller at
+// /articles/{id}/relationships/reviewers
+@GetMapping
+List<ResourceIdentifier> get(@PathVariable String id) {
+    return articles.getReviewers(id);
+}
+
+@PatchMapping
+ResponseEntity<Void> replace(
+        @PathVariable String id,
+        @RequestBody List<ResourceIdentifier> reviewers) {
+    articles.setReviewers(id, reviewers);
+    return ResponseEntity.noContent().build();
+}
+
+@PostMapping
+ResponseEntity<Void> add(
+        @PathVariable String id,
+        @RequestBody List<ResourceIdentifier> reviewers) {
+    articles.addReviewers(id, reviewers);
+    return ResponseEntity.noContent().build();
+}
+
+@DeleteMapping
+ResponseEntity<Void> remove(
+        @PathVariable String id,
+        @RequestBody List<ResourceIdentifier> reviewers) {
+    articles.removeReviewers(id, reviewers);
+    return ResponseEntity.noContent().build();
+}
+```
+
+```http
+POST /articles/42/relationships/reviewers
+Content-Type: application/vnd.api+json
+
+{"data":[{"type":"people","id":"2"}]}
+```
+
+DELETE accepts the same array shape to remove linkage, not the related
+resources themselves. PATCH with `{"data":[]}` clears the collection.
+An empty to-many GET returns 200 with `{"data":[]}`.
+
+The adapter preserves identifier metadata and supported identity members.
+Core 0.5.1 rejects resource-only members such as `attributes`, `relationships`
+and `links` on primary identifiers. Missing `data`, invalid identifiers
+and wrong cardinality produce JSON:API 400 errors with the protocol resolver.
+The application owns authorization, related-resource existence, mutation
+semantics, persistence and response status. It may return updated linkage
+with 200 or a bodyless 204 when appropriate.
+
+Conventional linkage binding writes identifiers only. Nonempty `include`
+requests on this binding path produce 400. For advanced relationship
+responses with top-level links, meta or included resources, use
+`JsonApiDocumentResponseWriter` with an application-supplied document and
+explicit status. The application owns include support and data loading;
+the converter does not hydrate related DTOs.
 
 ## Request-body validation
 
@@ -240,4 +380,4 @@ Generated validation errors omit their optional per-error `status` member; the
 application owns the HTTP response status. Ordinary Spring MVC endpoints are unchanged.
 
 For resource annotations, detailed PATCH, relationships and query semantics, use the
-[framework-neutral jsonapi-java guide](https://jsonapi.kazforge.com/core/0.5.0/).
+[framework-neutral jsonapi-java guide](https://jsonapi.kazforge.com/core/0.5.1/).
