@@ -82,8 +82,12 @@ class JsonApiRelationshipBindingTest {
                   }
                   writes++;
                   written = args[0];
-                  if (failure != null) throw failure;
-                  ((OutputStream) args[1]).write("linkage".getBytes(StandardCharsets.UTF_8));
+                  var output = (OutputStream) args[1];
+                  if (failure != null) {
+                    output.write("link".getBytes(StandardCharsets.UTF_8));
+                    throw failure;
+                  }
+                  output.write("linkage".getBytes(StandardCharsets.UTF_8));
                   return null;
                 });
     JsonApi runtime =
@@ -279,10 +283,10 @@ class JsonApiRelationshipBindingTest {
         HttpMessageNotWritableException.class,
         () -> converter.write(invalidValues, MANY, JSON_API, invalidOutput));
     failure = new IllegalStateException("private");
-    var output = new MockHttpOutputMessage();
+    var output = new ServletServerHttpResponse(response);
     assertThrows(
         HttpMessageNotWritableException.class, () -> converter.write(ID, JSON_API, output));
-    assertEquals("", output.getBodyAsString());
+    assertArrayEquals(new byte[0], response.getContentAsByteArray());
     assertEquals(1, writes);
   }
 
