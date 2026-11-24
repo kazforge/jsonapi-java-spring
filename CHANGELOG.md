@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/kazforge/jsonapi-java-spring/compare/v0.4.0...v0.5.0) (2026-11-24)
+
+
+### Features
+
+* **webmvc:** bind relationship linkage endpoints ([a3278d1](https://github.com/kazforge/jsonapi-java-spring/commit/a3278d150c021ad3fb8c1d5001756c456bf1ed00))
+
 ## [0.4.0](https://github.com/kazforge/jsonapi-java-spring/compare/v0.3.0...v0.4.0) (2026-11-23)
 
 
