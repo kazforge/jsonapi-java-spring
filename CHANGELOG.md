@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/kazforge/jsonapi-java-spring/compare/v0.5.0...v0.6.0) (2026-11-25)
+
+
+### Features
+
+* **webmvc:** bind typed query DTOs from the parsed request ([a0031f4](https://github.com/kazforge/jsonapi-java-spring/commit/a0031f4463e8d4db2e00f2810e22c667e703843f))
+
 ## [0.5.0](https://github.com/kazforge/jsonapi-java-spring/compare/v0.4.0...v0.5.0) (2026-11-24)
 
 

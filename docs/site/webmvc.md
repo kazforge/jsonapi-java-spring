@@ -43,6 +43,8 @@ with `addCustomConverter` so controllers and exception handlers can return
 For [relationship-linkage endpoints](#relationship-linkage), register
 `JsonApiRelationshipHttpMessageConverter(runtime)` with `addCustomConverter` as well.
 Keep these custom converters ahead of Spring's defaults.
+For [typed query DTOs](#typed-query-binding), also register
+`JsonApiQueryParamsArgumentResolver` in `addArgumentResolvers`.
 For exact imports and registration code, see the release-matched
 `ConsumerConfiguration` in the example linked below.
 
@@ -79,9 +81,136 @@ release-matched example:
 
 <!-- x-release-please-start-version -->
 
-[Tested Jackson 3 WebMVC consumer](https://github.com/kazforge/jsonapi-java-spring/tree/v0.5.0/examples/jackson3-webmvc)
+[Tested Jackson 3 WebMVC consumer](https://github.com/kazforge/jsonapi-java-spring/tree/v0.6.0/examples/jackson3-webmvc)
 
 <!-- x-release-please-end -->
+
+## Typed query binding
+
+Use `@JsonApiQueryParams` on a controller argument to bind an application-owned
+record or POJO from the already parsed URL query. Spring's `@BindParam` names
+the exact parameter, including brackets. The resolver uses MVC's conversion
+service and, with `@Valid`, its configured validator.
+
+### Numbered pagination
+
+```java
+import com.kazforge.jsonapi.query.JsonApiQuery;
+import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
+import com.kazforge.jsonapi.spring.webmvc.request.JsonApiQueryParams;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.web.bind.annotation.BindParam;
+import org.springframework.web.bind.annotation.GetMapping;
+import java.util.List;
+
+enum Status { DRAFT, PUBLISHED }
+
+record ArticleQuery(
+    @BindParam("filter[status]") Status status,
+    @BindParam("page[number]") @NotNull @Min(1) Integer number,
+    @BindParam("page[size]") @NotNull @Min(1) Integer size,
+    JsonApiQuery requested) {}
+
+@JsonApiEndpoint
+@GetMapping("/articles/search")
+public List<Article> search(@Valid @JsonApiQueryParams ArticleQuery query) {
+    return articleService.search(query);
+}
+```
+
+Here `Article` is an annotated resource DTO and `articleService` is application
+code on an existing REST controller.
+
+```http
+GET /articles/search?filter[status]=PUBLISHED&page[number]=2&page[size]=20&sort=-title&include=author&fields[articles]=title,author&fields[people]=name
+```
+
+The DTO receives `Status.PUBLISHED`, page number 2 and size 20. The optional,
+unannotated `JsonApiQuery` input receives the original parsed query:
+`query.requested().sort()` exposes the ordered sort fields and
+`query.requested().selection()` exposes requested includes and sparse fieldsets.
+
+The service decides how to filter, order and paginate results and which
+authorized related objects to load. The resource converter automatically
+passes the original selection to Core's writer: with a loaded author and a
+runtime policy allowing that inclusion, the response contains the author in
+`included`, the selected article fields and only the selected person fields.
+There is no additional controller-side serialization step. See
+[Core query and representation](https://jsonapi.kazforge.com/core/0.5.1/query-and-representation/)
+for resource DTO and representation policy examples.
+
+For pagination links and metadata, the controller can return
+`JsonApiResponse<List<Article>>` using `JsonApiResponse.of(results)` with
+`withLinks(...)` and `withMeta(...)` (`JsonApiResponse` is in
+`com.kazforge.jsonapi.spring.webmvc.document`). The application computes those
+values; binding does not prescribe a page model.
+
+### Cursor pagination and repeated parameters
+
+```java
+enum Kind { CREATE, UPDATE }
+
+record EventFeed(
+    @BindParam("filter[kind]") List<Kind> kinds,
+    @BindParam("page[after]") String after) {}
+
+@JsonApiEndpoint
+@GetMapping("/events")
+public List<Event> events(@Valid @JsonApiQueryParams EventFeed query) {
+    return eventService.find(query);
+}
+```
+
+```http
+GET /events?filter[kind]=CREATE&filter[kind]=UPDATE&page[after]=evt42
+```
+
+The application receives `List.of(Kind.CREATE, Kind.UPDATE)` and `"evt42"`.
+It defines the meaning of the cursor and repeated filters, including whether
+a missing cursor starts a new feed. No shared pagination or filter DTO is required.
+
+### Binding and validation rules
+
+- Use a record's canonical constructor or a POJO with one public constructor.
+  Each opaque input (filter, page or custom parameter) requires an explicit
+  `@BindParam`. Dots and brackets are literal names, not nested property paths.
+  Use at most one unannotated `JsonApiQuery` input for sort and representation.
+- Use Spring-convertible simple reference types (for example `Integer`, not
+  `int`) or `List<T>` of a concrete simple reference type; `Class` is excluded.
+  Missing scalars are null and missing lists are empty. Explicit empty strings
+  are preserved for string inputs; other values must convert to non-null values.
+- A scalar accepts one occurrence. Lists preserve occurrence order and
+  duplicates; comma-separated values are not split. Undeclared opaque
+  parameters are rejected. No setters or nested property paths are bound.
+
+With the protocol resolver registered, invalid values, repeated scalar
+parameters, unsupported opaque parameters and `@Valid` failures produce HTTP
+400 JSON:API errors. For example, `page[size]=0` in an otherwise valid search:
+
+```json
+{
+  "errors": [
+    {
+      "status": "400",
+      "code": "INVALID_QUERY_PARAMETER",
+      "title": "Invalid query parameter",
+      "source": {"parameter": "page[size]"}
+    }
+  ]
+}
+```
+
+Validation errors identify the exact supplied parameter when the property
+(or list element) maps directly to it. For POJOs, compile with `-parameters`
+and use matching constructor parameter and property names for attribution.
+Missing inputs, class-level errors and unrecognized property paths have no
+source. Rejected values and internal messages are not exposed. Invalid DTO
+declarations and constructor failures are application errors.
+
+Use `JsonApiRequestContext` directly when the application needs custom binding
+rules. Ordinary MVC endpoints and resource request-body binding are unchanged.
 
 ## Application errors
 
