@@ -10,6 +10,7 @@ import com.kazforge.jsonapi.query.JsonApiQueryException;
 import com.kazforge.jsonapi.spring.webmvc.document.JsonApiDocumentResponseWriter;
 import com.kazforge.jsonapi.spring.webmvc.internal.JsonApiHandlers;
 import com.kazforge.jsonapi.spring.webmvc.internal.ProtocolError;
+import com.kazforge.jsonapi.spring.webmvc.internal.QueryBindingFailure;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -70,6 +71,8 @@ public final class JsonApiProtocolExceptionResolver implements HandlerExceptionR
       HttpServletRequest request, Exception exception) {
     return switch (exception) {
       case JsonApiQueryException query -> queryFailure(query);
+      case QueryBindingFailure invalid ->
+          new ProtocolFailure(HttpStatus.BAD_REQUEST, JsonApiErrorResponse.of(invalid.errors()));
       case JsonApiDocumentReadException read -> documentFailure(read);
       case HttpMessageNotReadableException read -> unreadableFailure(read);
       case MethodArgumentNotValidException invalidBody ->
