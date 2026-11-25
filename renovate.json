@@ -28,6 +28,12 @@
       "matchManagers": ["gradle"],
       "matchPackageNames": ["org.springframework:spring-framework-bom"],
       "allowedVersions": "/^7\\.0\\.\\d+$/"
+    },
+    {
+      "description": "The same Boot BOM defines both the published floor and the tested patch; update these deliberately.",
+      "matchManagers": ["gradle"],
+      "matchPackageNames": ["org.springframework.boot:spring-boot-dependencies"],
+      "enabled": false
     }
   ],
   "vulnerabilityAlerts": {"semanticCommitType": "fix"}

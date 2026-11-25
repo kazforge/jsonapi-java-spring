@@ -17,3 +17,4 @@ their replacements. See [Architecture](../architecture.md) for current structure
 | [0009 — Operation-aware relationship linkage binding](0009-operation-aware-relationship-linkage-binding.md) | Accepted |
 | [0010 — Keep filter and page semantics application-owned](0010-keep-filter-and-page-semantics-application-owned.md) | Accepted |
 | [0011 — Bind typed queries by exact constructor inputs](0011-explicit-constructor-query-binding.md) | Accepted |
+| [0012 — Boot-managed WebMVC starter](0012-boot-managed-webmvc-starter.md) | Accepted |

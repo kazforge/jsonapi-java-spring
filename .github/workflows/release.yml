@@ -70,9 +70,10 @@ jobs:
         with:
           subject-path: |
             build/staging-deploy/com/kazforge/jsonapi-java-spring-webmvc/*/*.jar
+            build/staging-deploy/com/kazforge/jsonapi-java-spring-boot-starter/*/*.jar
             !build/staging-deploy/**/*-sources.jar
             !build/staging-deploy/**/*-javadoc.jar
-      - name: Attest primary JAR SBOM
+      - name: Attest WebMVC SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
@@ -80,6 +81,14 @@ jobs:
             !build/staging-deploy/**/*-sources.jar
             !build/staging-deploy/**/*-javadoc.jar
           sbom-path: jsonapi-java-spring-webmvc/build/reports/release/bom.json
+      - name: Attest Boot starter SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            build/staging-deploy/com/kazforge/jsonapi-java-spring-boot-starter/*/*.jar
+            !build/staging-deploy/**/*-sources.jar
+            !build/staging-deploy/**/*-javadoc.jar
+          sbom-path: jsonapi-java-spring-boot-starter/build/reports/release/bom.json
       - name: Assemble Central Portal bundle
         run: |
           test -d build/staging-deploy

@@ -267,6 +267,31 @@ class JsonApiResourceBindingTest {
   }
 
   @Test
+  void onlyReadTimeIncludeDiagnosticsWithARequestedPathAreQueryErrors() throws Exception {
+    for (MappingDiagnostic diagnostic :
+        List.of(
+            MappingDiagnostic.DENIED_RELATIONSHIP_INCLUDE,
+            MappingDiagnostic.INVALID_INCLUDE_PATH)) {
+      runtime.writeDiagnostic = diagnostic;
+      mvc.perform(get("/one").queryParam("include", "author")).andExpect(status().isBadRequest());
+      var error = Objects.requireNonNull(runtime.error.errors()).getFirst();
+      assertEquals("DISALLOWED_INCLUDE_PATH", error.code());
+      assertEquals("include", Objects.requireNonNull(error.source()).parameter());
+    }
+    mvc.perform(get("/one")).andExpect(status().isInternalServerError());
+    mvc.perform(
+            post("/resources")
+                .queryParam("include", "author")
+                .contentType(JSON_API)
+                .content("valid"))
+        .andExpect(status().isInternalServerError());
+    runtime.writeDiagnostic = MappingDiagnostic.MISSING_RESOURCE_ANNOTATION;
+    mvc.perform(get("/one").queryParam("include", "author"))
+        .andExpect(status().isInternalServerError());
+    assertEquals("RESPONSE_SERIALIZATION_FAILED", errorCode(runtime.error));
+  }
+
+  @Test
   void writesSingletonAndCollectionValuesThroughActualMvcConverter() throws Exception {
     mvc.perform(get("/one").accept("application/vnd.api+json").queryParam("include", "author"))
         .andExpect(status().isOk())
@@ -756,6 +781,7 @@ class JsonApiResourceBindingTest {
     boolean failWrite;
     boolean unsupportedSources;
     @Nullable MappingDiagnostic mappingDiagnostic;
+    @Nullable MappingDiagnostic writeDiagnostic;
     JsonApiDocument error =
         JsonApiDocument.withError(com.kazforge.jsonapi.core.model.ErrorObject.ofTitle("initial"));
     @Nullable Type readType;
@@ -805,6 +831,10 @@ class JsonApiResourceBindingTest {
                           yield new RecordedBinding<>(new Dto(readBody));
                         }
                         case "writeOne", "writeMany" -> {
+                          if (writeDiagnostic != null) {
+                            throw JsonApiMappingException.withoutLocation(
+                                writeDiagnostic, Dto.class, "private write details");
+                          }
                           writes.add(method.getName());
                           if (failWrite) {
                             throw new IllegalStateException("secret");

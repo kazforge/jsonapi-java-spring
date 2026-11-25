@@ -6,8 +6,10 @@ import com.kazforge.jsonapi.api.*;
 import com.kazforge.jsonapi.core.validation.PrimaryDataContext;
 import com.kazforge.jsonapi.patch.PatchCommand;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
+import com.kazforge.jsonapi.spring.webmvc.JsonApiPatchTarget;
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContextInterceptor;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -24,6 +26,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerMapping;
 
 /**
  * Declaration checks must fail before consulting the application's identity callback or runtime.
@@ -112,6 +115,36 @@ class JsonApiPatchTargetTest {
   @SuppressWarnings("unused") // Selected reflectively by HandlerMethod.
   public void endpoint() {
     throw new AssertionError("Only endpoint metadata is needed for converter preflight");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"endpoint,id,42", "target,other,42", "target,id,' '", "blankType,id,42"})
+  void invalidRouteMetadataNeverFallsBackToReadingTheBody(
+      String handler, String variable, String id) throws Exception {
+    var request = new MockHttpServletRequest("PATCH", "/articles/42");
+    var method = new HandlerMethod(this, handler);
+    request.setAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE, method);
+    request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of(variable, id));
+    new JsonApiRequestContextInterceptor()
+        .preHandle(request, new MockHttpServletResponse(), method);
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    var converter = new JsonApiResourceHttpMessageConverter(unusedRuntime);
+    var input = new MockHttpInputMessage(new byte[0]);
+    assertThrows(HttpMessageConversionException.class, () -> converter.read(Dto.class, input));
+  }
+
+  @JsonApiEndpoint
+  @JsonApiPatchTarget("articles")
+  @SuppressWarnings("unused") // Matched reflectively by HandlerMethod.
+  public void target() {
+    throw new AssertionError("Converter preflight must not invoke the PATCH handler");
+  }
+
+  @JsonApiEndpoint
+  @JsonApiPatchTarget(" ")
+  @SuppressWarnings("unused") // Matched reflectively by HandlerMethod.
+  public void blankType() {
+    throw new AssertionError("A PATCH handler with an invalid target must not be invoked");
   }
 
   @SuppressWarnings({"unused", "rawtypes"}) // Reflection-only controller target declarations.
