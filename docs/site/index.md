@@ -6,8 +6,8 @@ description: JSON:API 1.1 HTTP integration for Spring Framework 7
 # Spring WebMVC
 
 `jsonapi-java-spring-webmvc` adds opt-in JSON:API 1.1 handling to Spring MVC
-controllers: media negotiation, request/query context, resource DTO binding, relationship-linkage endpoints,
-request-body validation and protocol errors. Ordinary MVC endpoints are unaffected.
+controllers: media negotiation, typed query and resource DTO binding, relationship-linkage
+endpoints, request-body validation and protocol errors. Ordinary MVC endpoints are unaffected.
 
 This is a companion to the framework-neutral
 [jsonapi-java guide](https://jsonapi.kazforge.com/core/0.5.1/). Spring and Core have
