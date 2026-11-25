@@ -32,7 +32,7 @@ jobs:
         run: ./gradlew clean spotlessCheck build
       - name: Verify current Spring adapter compatibility
         if: matrix.spring-test-version == 'current'
-        run: ./gradlew :jsonapi-java-spring-webmvc:clean :jsonapi-java-spring-webmvc:build -PspringTestVersion=current
+        run: ./gradlew :jsonapi-java-spring-webmvc:build :examples:boot-webmvc:build -PspringTestVersion=current
       # Only main and same-repository PRs are trusted; fork PRs skip all Sonar steps.
       - name: Sonar Scan (trusted Java 21 path)
         if: matrix.spring-test-version == 'minimum' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)

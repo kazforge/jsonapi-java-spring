@@ -17,6 +17,8 @@ without affecting ordinary Spring MVC endpoints. [ADRs](adr/README.md) record du
 | Root build | Build/quality orchestration and Sonar configuration. |
 | `build-logic` | Reusable formatting and Java library quality conventions. |
 | `jsonapi-java-spring-webmvc` | Neutral WebMVC integration: media negotiation, request/query context, resource DTO, presence-aware PATCH and relationship-linkage binding, validation/protocol/application errors, and explicit document responses. |
+| `jsonapi-java-spring-boot-starter` | Boot servlet auto-configuration, Jackson 3 runtime and validation provider. |
+| `examples/boot-webmvc` | Unpublished runnable Boot application and embedded HTTP integration tests. |
 | `examples/jackson3-webmvc` | Non-published application wiring and real Jackson 3 consumer smoke tests. |
 | `gradle/libs.versions.toml` | Shared build/dependency versions. |
 | `.github` | Repository CI and quality-gate automation. |
@@ -44,7 +46,8 @@ in `.media`, request context in `.request`, error translation in `.error`, expli
 response transport in `.document`, and the PATCH value extractor in `.validation`. Production
 packages are null-marked.
 
-Applications register `JsonApiMediaNegotiationInterceptor` before
+Boot-managed MVC gets the following wiring from the starter. With standalone MVC,
+applications register `JsonApiMediaNegotiationInterceptor` before
 `JsonApiRequestContextInterceptor`, plus `JsonApiMediaNegotiationAdvice` as a bean and
 `JsonApiRequestContextArgumentResolver` through `WebMvcConfigurer#addArgumentResolvers`.
 Resource DTO binding additionally registers one `JsonApiResourceHttpMessageConverter` with Spring
@@ -73,7 +76,8 @@ non-null; plain null or bodyless returns remain Spring bodyless responses.
 For resource PATCH, the same converter binds `@RequestBody` typed PATCH DTOs through
 `JsonApi.patches().bindPatchWithSources`, or an explicit `PatchCommand<T>` through `bindCommand`. One
 neutral document read performs update validation using application-supplied, request-scoped endpoint
-identity before binding. Missing identity fails closed. Core owns presence and PATCH semantics; Spring owns
+identity before binding. Declare `@JsonApiPatchTarget` on the matched method or supply a
+trusted identity callback. Missing identity fails closed. Core owns presence and PATCH semantics; Spring owns
 type resolution and HTTP adaptation. See [ADR 0007](adr/0007-presence-aware-resource-patch-binding.md)
 for the decision.
 
@@ -151,10 +155,11 @@ classified as client errors.
 
 ### Body validation
 
-Applications choose and configure their Jakarta Validation provider. Explicitly register
+Standalone applications choose and configure their Jakarta Validation provider. Explicitly register
 `PatchPresenceValueExtractor` with that provider for PATCH type-use constraints and cascading:
 omitted wrappers emit no value, while supplied values (including explicit null) are validated.
-Class constraints can inspect presence. This rule does not exempt missing children of a supplied
+The Boot starter supplies the same extractor through the Jakarta service loader. Class
+constraints can inspect presence. This rule does not exempt missing children of a supplied
 atomic replacement, and `included` resources are not independently validated as beans.
 
 For a `MethodArgumentNotValidException` on the matched create or typed PATCH body, the resolver
@@ -196,7 +201,9 @@ envelopes are written as supplied.
 All response paths serialize fully before writing. The resource and linkage converters share
 buffered output handling, skip committed responses and reset uncommitted output mode while
 restoring status and headers; the advanced writer likewise
-preserves headers. Failures are logged and produce a generic 500, or bodyless 500 if error
+preserves headers. A resource GET/HEAD with a denied or unknown requested include returns
+400 with `source.parameter=include`. This write-time check is not pre-mutation validation.
+Other serialization failures are logged and produce a generic 500, or bodyless 500 if error
 serialization also fails. Transport I/O is not retried. Responses use bare
 `application/vnd.api+json` and merge `Vary: Accept`, even for 406 errors.
 
@@ -205,8 +212,10 @@ No custom dependency or class-file scanners are used. The adapter exposes no Jac
 
 ## Compatibility
 
-Only WebMVC opts into the publication convention. The example remains unpublished;
-its Jackson dependencies never enter publication metadata or release SBOMs.
+WebMVC and the Boot starter opt into the publication convention. Examples remain unpublished.
+The starter supports Boot 4.1.x from 4.1.2, using Boot's managed Jackson 3 rather than
+pinning a second version. See [ADR 0012](adr/0012-boot-managed-webmvc-starter.md)
+for registration, validator and runtime backoff, and application-owned policy.
 [ADR 0006](adr/0006-independent-spring-release-lifecycle.md) records independent
 version semantics, signed publication and the explicit no-BOM decision.
 
@@ -214,11 +223,10 @@ The supported Spring line is 7.0, with a 7.0.9 minimum, Java 21 and Servlet 6.1.
 Production compilation and the published WebMVC API dependency use this same minimum.
 Applications should use the latest patched 7.0.x release; the supported minimum is not a
 promise of ongoing security fixes. Standard tests select minimum or current stable 7.0
-with `springTestVersion`; both run in the CI matrix and initially resolve to 7.0.9.
+with `springTestVersion`; both run in the CI matrix.
 Only the current test target advances with newer supported patches; it does not raise the
 published dependency baseline. Spring 6.2 and Spring 7.1 milestones are not supported targets.
 
-The consumer example separately uses the catalog's current Spring patch for both compilation
-and tests. CI's minimum leg runs the full build, including that fixed-current consumer;
-the current leg runs only the adapter build. This avoids multiplying consumer tests by
-the adapter's compatibility dimension. The root build still runs all modules locally.
+The standalone consumer example separately uses the catalog's current Spring patch.
+CI's minimum leg runs the full build. Its current leg tests the adapter on the current
+Framework patch and the Boot example on the current supported Boot patch.

@@ -15,6 +15,17 @@ plugins {
     id("jsonapi-java-spring-spotless")
 }
 
+subprojects {
+    pluginManager.withPlugin("org.cyclonedx.bom") {
+        tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
+            includeConfigs = listOf("compileClasspath", "runtimeClasspath")
+            includeMetadataResolution = false
+            xmlOutput.unsetConvention()
+            jsonOutput.set(layout.buildDirectory.file("reports/release/bom.json"))
+        }
+    }
+}
+
 tasks.check {
     dependsOn("spotlessCheck", gradle.includedBuild("build-logic").task(":check"))
 }

@@ -15,6 +15,9 @@ import com.kazforge.jsonapi.document.DocumentReadContext;
 import com.kazforge.jsonapi.document.PrimaryDataKind;
 import com.kazforge.jsonapi.mapping.BoundResource;
 import com.kazforge.jsonapi.patch.PatchCommand;
+import com.kazforge.jsonapi.query.JsonApiQueryException;
+import com.kazforge.jsonapi.query.QueryDiagnostic;
+import com.kazforge.jsonapi.spring.webmvc.JsonApiPatchTarget;
 import com.kazforge.jsonapi.spring.webmvc.error.JsonApiErrorResponse;
 import com.kazforge.jsonapi.spring.webmvc.internal.JsonApiBodyBinding;
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContext;
@@ -28,6 +31,7 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
@@ -43,6 +47,8 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerMapping;
 
 /**
  * Binds resource DTOs only for an opted-in resource handler dispatch.
@@ -50,9 +56,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * <p>POST uses resource creation binding. PATCH uses typed PATCH DTO binding, with patchable
  * members declared as {@code PatchPresence<T>}; an explicit {@code PatchCommand<T>} request body
  * instead selects command binding for the fully resolved resource type {@code T}. Resource PATCH
- * requires request-scoped endpoint identity through the constructor callback. Neither path applies
- * mutations or independently binds included resources. Relationship-linkage handlers are not
- * claimed.
+ * requires request-scoped endpoint identity from {@link JsonApiPatchTarget} or a constructor
+ * callback. Neither path applies mutations or independently binds included resources.
+ * Relationship-linkage handlers are not claimed.
  *
  * <p>Create and typed PATCH require a runtime supporting Core's source-aware operations. The bound
  * DTO is returned directly to Spring; only the current dispatch retains its attribution for
@@ -67,10 +73,10 @@ public final class JsonApiResourceHttpMessageConverter
   private final Function<HttpServletRequest, @Nullable EndpointIdentity> endpointIdentity;
 
   /**
-   * Creates a converter for resource creation and responses; PATCH requires an identity callback.
+   * Creates a converter using the matched method's {@link JsonApiPatchTarget} for resource PATCH.
    */
   public JsonApiResourceHttpMessageConverter(JsonApi runtime) {
-    this(runtime, request -> null);
+    this(runtime, JsonApiResourceHttpMessageConverter::matchedIdentity);
   }
 
   /**
@@ -85,6 +91,23 @@ public final class JsonApiResourceHttpMessageConverter
       JsonApi runtime, Function<HttpServletRequest, @Nullable EndpointIdentity> endpointIdentity) {
     this.runtime = Objects.requireNonNull(runtime, "runtime");
     this.endpointIdentity = Objects.requireNonNull(endpointIdentity, "endpointIdentity");
+  }
+
+  private static @Nullable EndpointIdentity matchedIdentity(HttpServletRequest request) {
+    if (!(request.getAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE)
+        instanceof HandlerMethod method)) {
+      return null;
+    }
+    JsonApiPatchTarget target = method.getMethodAnnotation(JsonApiPatchTarget.class);
+    if (target != null
+        && !target.value().isBlank()
+        && request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE)
+            instanceof Map<?, ?> variables
+        && variables.get(target.idVariable()) instanceof String id
+        && !id.isBlank()) {
+      return new EndpointIdentity(target.value(), id);
+    }
+    return null;
   }
 
   @Override
@@ -281,12 +304,25 @@ public final class JsonApiResourceHttpMessageConverter
         runtime.resources().writeOne(value, options, serialized);
       }
     } catch (RuntimeException failure) {
+      if (isRejectedReadInclude(context, failure)) {
+        throw new JsonApiQueryException(
+            QueryDiagnostic.DISALLOWED_INCLUDE_PATH, "include", "Unsupported resource include");
+      }
       LOGGER.log(
           System.Logger.Level.WARNING, "JSON:API resource response serialization failed", failure);
       throw new HttpMessageNotWritableException(
           "Could not serialize JSON:API resource response", failure);
     }
     JsonApiBodyWriter.write(serialized, outputMessage, servletResponse);
+  }
+
+  private static boolean isRejectedReadInclude(
+      JsonApiRequestContext context, RuntimeException failure) {
+    return (HttpMethod.GET.equals(context.method()) || HttpMethod.HEAD.equals(context.method()))
+        && !context.representationSelection().includePaths().isEmpty()
+        && failure instanceof JsonApiMappingException mapping
+        && (mapping.diagnostic() == MappingDiagnostic.DENIED_RELATIONSHIP_INCLUDE
+            || mapping.diagnostic() == MappingDiagnostic.INVALID_INCLUDE_PATH);
   }
 
   private static boolean supportsBodyType(@Nullable Type type, @Nullable Class<?> valueClass) {

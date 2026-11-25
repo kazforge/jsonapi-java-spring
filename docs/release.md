@@ -13,9 +13,10 @@ are recorded in [ADR 0006](adr/0006-independent-spring-release-lifecycle.md).
 3. The publish job checks out that tag, builds and signs publications, attests primary
    JAR provenance and its CycloneDX SBOM, then uploads the bundle for automatic Central publication.
 
-Only `com.kazforge:jsonapi-java-spring-webmvc` is published, with sources, Javadocs,
-POM, Gradle metadata and a signed `cyclonedx.json` classifier. The SBOM covers production
-dependencies, not tests or the unpublished Jackson 3 example. The adapter stays
+Publish `com.kazforge:jsonapi-java-spring-webmvc` and `com.kazforge:jsonapi-java-spring-boot-starter`
+in one bundle. Each gets sources, Javadocs, POM, Gradle metadata, a signed `cyclonedx.json`
+classifier and a primary JAR attested against its own SBOM. Each SBOM covers that
+artifact's production dependencies, not tests or examples. The adapter stays
 Jackson-neutral and consumes the published Core API/query baseline in the catalog; Spring's
 version is independent.
 The first release requires Spring Framework 7.0.9 or later in the supported 7.0.x line,
@@ -23,7 +24,9 @@ both as the supported minimum and the declared WebMVC API dependency. See
 [compatibility](architecture.md#compatibility) for the minimum/current test policy.
 
 Before announcing availability, verify Central publication, signatures and GitHub
-attestations, then test a clean external consumer. A GitHub Release or successful
+attestations for both artifacts, then test two clean external consumers using only Central:
+a Boot app with the starter and a standalone MVC app with its chosen runtime.
+Stage the versioned starter setup guide in the release PR. A GitHub Release or successful
 upload alone does not confirm Central availability.
 
 ## Recovery

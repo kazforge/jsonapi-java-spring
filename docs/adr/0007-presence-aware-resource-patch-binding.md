@@ -19,8 +19,9 @@ The conventional controller parameter is a typed `@RequestBody` PATCH DTO whose 
 use `PatchPresence<T>`. An explicit, fully resolved `PatchCommand<T>` parameter selects the
 infrastructure path. Raw, wildcard, unresolved, and bulk targets are configuration errors.
 
-An application-owned constructor callback supplies Core's `EndpointIdentity` from the current
-servlet request. Missing identity fails closed rather than silently disabling comparison.
+The matched method's `@JsonApiPatchTarget` or an explicit application-owned constructor
+callback supplies Core's `EndpointIdentity` from the current servlet request (see
+[ADR 0012](0012-boot-managed-webmvc-starter.md)). Missing identity fails closed.
 
 Read once through `JsonApi.documents().read` using resource decoding and a request-local
 `ValidationContext` selecting `UPDATE_REQUEST` and the expected endpoint identity. Then call

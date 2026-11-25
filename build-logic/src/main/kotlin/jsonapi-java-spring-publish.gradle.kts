@@ -21,7 +21,7 @@ publishing {
             }
             pom {
                 name.set(project.name)
-                description.set("Jackson-neutral JSON:API HTTP adaptation for Spring WebMVC.")
+                description.set(provider { project.description })
                 url.set("https://github.com/kazforge/jsonapi-java-spring")
                 licenses {
                     license {

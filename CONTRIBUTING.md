@@ -61,7 +61,8 @@ The non-published `examples/jackson3-webmvc` module reuses library quality conve
 including the unchanged coverage thresholds, but supplies application-owned Jackson 3
 wiring. It always uses the current Spring BOM, independently of `springTestVersion`.
 CI's minimum leg runs the full root build (including this consumer); its current leg
-runs `:jsonapi-java-spring-webmvc:build -PspringTestVersion=current` only.
+runs `:jsonapi-java-spring-webmvc:build :examples:boot-webmvc:build -PspringTestVersion=current`.
+The Boot example exercises the minimum/current Boot BOMs; run it with `:examples:boot-webmvc:run`.
 
 ## Repository documentation
 
@@ -91,7 +92,7 @@ workflow is introduced. Normal
 `./gradlew clean build` never runs Sonar or needs a token; formatting, compiler/nullness,
 tests, and JaCoCo's 80/80 verification remain authoritative. Jackson-specific CPD/source
 exclusions and unrelated security tooling are not copied. CycloneDX and publication/signing
-apply only to the published WebMVC module, not to the shared quality convention.
+apply only to the published WebMVC and starter modules, not to examples.
 Modules with executable production code supply coverage reports through the library convention.
 
 Files use UTF-8 and LF, except Windows `.bat`/`.cmd` scripts use CRLF. Keep the wrapper
