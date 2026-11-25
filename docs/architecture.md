@@ -118,10 +118,18 @@ request by raw query input for redispatch; operation metadata is refreshed for e
 Ordinary handlers clear the dispatch context. Representation selection is the query's existing
 neutral value, not a separate Spring model or effective authorization decision.
 
-Controllers read opaque filter, page, and custom values from `JsonApiRequestContext.query()`.
+Controllers can read opaque filter, page, and custom values from `JsonApiRequestContext.query()`
+or accept a typed query DTO. Register `JsonApiQueryParamsArgumentResolver` and annotate the
+controller parameter with `@JsonApiQueryParams`. Bind exact decoded names using Spring's
+`@BindParam` on record components or the parameters of a single public constructor. Only those
+inputs are converted; no setter or nested property path is bound. An optional unannotated
+`JsonApiQuery` constructor parameter receives the original sort and representation selection.
+`@Valid` uses the application's MVC validator. Query violations identify supplied URL parameters
+where known, never body pointers. See [ADR 0011](adr/0011-explicit-constructor-query-binding.md)
+for cardinality and failure behavior.
+
 Applications define what filters mean, how to paginate results, and which links and meta to
-return. Future typed controller binding will reuse those parsed values; it does not require
-a shared filter or pagination model. See [ADR 0010](adr/0010-keep-filter-and-page-semantics-application-owned.md).
+return. There is no shared filter or pagination model. See [ADR 0010](adr/0010-keep-filter-and-page-semantics-application-owned.md).
 Applications own query execution, endpoint support policy, authorization, and route identity.
 Parser exceptions retain their neutral diagnostics; the protocol resolver translates them
 without treating exception messages as public contracts.

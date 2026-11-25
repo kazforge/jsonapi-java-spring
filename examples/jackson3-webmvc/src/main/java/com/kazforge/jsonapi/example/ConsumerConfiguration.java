@@ -3,17 +3,22 @@ package com.kazforge.jsonapi.example;
 import com.kazforge.jsonapi.api.JsonApi;
 import com.kazforge.jsonapi.core.validation.EndpointIdentity;
 import com.kazforge.jsonapi.jackson3.JsonApiJackson3;
+import com.kazforge.jsonapi.representation.IncludePolicy;
+import com.kazforge.jsonapi.representation.RelationshipAllowance;
+import com.kazforge.jsonapi.representation.RepresentationPolicy;
 import com.kazforge.jsonapi.spring.webmvc.document.JsonApiRelationshipHttpMessageConverter;
 import com.kazforge.jsonapi.spring.webmvc.document.JsonApiResourceHttpMessageConverter;
 import com.kazforge.jsonapi.spring.webmvc.error.JsonApiErrorHttpMessageConverter;
 import com.kazforge.jsonapi.spring.webmvc.error.JsonApiProtocolExceptionResolver;
 import com.kazforge.jsonapi.spring.webmvc.media.JsonApiMediaNegotiationAdvice;
 import com.kazforge.jsonapi.spring.webmvc.media.JsonApiMediaNegotiationInterceptor;
+import com.kazforge.jsonapi.spring.webmvc.request.JsonApiQueryParamsArgumentResolver;
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContextArgumentResolver;
 import com.kazforge.jsonapi.spring.webmvc.request.JsonApiRequestContextInterceptor;
 import com.kazforge.jsonapi.spring.webmvc.validation.PatchPresenceValueExtractor;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.HttpMessageConverters;
@@ -38,7 +43,10 @@ public class ConsumerConfiguration implements WebMvcConfigurer {
 
   @Bean
   public static JsonApi jsonApi() {
-    return JsonApiJackson3.jsonApi(JsonMapper.builder().build());
+    var includes = IncludePolicy.allowing(Set.of(RelationshipAllowance.of("articles", "author")));
+    return JsonApiJackson3.builder(JsonMapper.builder().build())
+        .representationPolicy(RepresentationPolicy.defaults().withIncludePolicy(includes))
+        .build();
   }
 
   @Bean
@@ -91,6 +99,7 @@ public class ConsumerConfiguration implements WebMvcConfigurer {
   @Override
   public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
     resolvers.add(new JsonApiRequestContextArgumentResolver());
+    resolvers.add(new JsonApiQueryParamsArgumentResolver());
   }
 
   @Override

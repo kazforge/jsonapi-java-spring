@@ -31,9 +31,9 @@ named values and converting them to Java types. They do not share a filter predi
 page calculation, or response metadata schema. A shared model would impose one
 application's choices on the other.
 
-Future opt-in WebMVC binding should use Spring conversion and validation to populate
-application-owned records or POJOs from the existing `JsonApiQuery`. This is a design
-constraint for a future controller API; automatic query DTO binding is not available today.
+Opt-in WebMVC binding uses Spring conversion and validation to populate application-owned
+records or POJOs from the existing `JsonApiQuery`, as specified in
+[ADR 0011](0011-explicit-constructor-query-binding.md).
 
 ## Consequences
 
