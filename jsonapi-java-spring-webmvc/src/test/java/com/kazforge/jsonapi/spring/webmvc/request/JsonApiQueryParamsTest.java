@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.kazforge.jsonapi.query.JsonApiQuery;
 import com.kazforge.jsonapi.query.JsonApiQueryParser;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
+import com.kazforge.jsonapi.spring.webmvc.internal.ProtocolError;
 import com.kazforge.jsonapi.spring.webmvc.internal.QueryBindingFailure;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +26,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.format.support.DefaultFormattingConversionService;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.util.SerializationUtils;
 import org.springframework.validation.Validator;
 import org.springframework.web.bind.annotation.BindParam;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -75,6 +77,15 @@ class JsonApiQueryParamsTest {
   }
 
   @Test
+  void explicitCanonicalConstructorUsesComponentAnnotationsUnlessOverridden() {
+    var inputs =
+        new QueryArguments(new JsonApiQueryParser().parseRaw("filter[term]=news&page[size]=20"));
+    assertEquals(
+        new ExplicitQuery("news", 20),
+        inputs.construct(ExplicitQuery.class, new DefaultFormattingConversionService()));
+  }
+
+  @Test
   void pojoUsesTheConfiguredMvcConversionServiceOnItsConstructorOnly() throws Exception {
     var service = new DefaultFormattingConversionService();
     service.addConverter(String.class, Integer.class, text -> Integer.parseInt(text, 16));
@@ -108,6 +119,13 @@ class JsonApiQueryParamsTest {
             () -> mvc.perform(get("/tags").queryParam("filter[tag]", "one", "")));
     var errors = assertInstanceOf(QueryBindingFailure.class, failure.getCause()).errors();
     assertEquals("filter[tag]", Objects.requireNonNull(errors.getFirst().source()).parameter());
+  }
+
+  @Test
+  void serializationPreservesAttributedAndUnattributedQueryErrors() {
+    var failure =
+        new QueryBindingFailure(ProtocolError.INVALID_QUERY_PARAMETER, "page[size]", null);
+    assertEquals(failure.errors(), SerializationUtils.clone(failure).errors());
   }
 
   @Test
@@ -152,11 +170,9 @@ class JsonApiQueryParamsTest {
     var query = new MethodParameter(method, 0);
     assertTrue(resolver.supportsParameter(query));
     assertFalse(resolver.supportsParameter(new MethodParameter(method, 1)));
+    var request = new ServletWebRequest(new MockHttpServletRequest());
     assertThrows(
-        IllegalStateException.class,
-        () ->
-            resolver.resolveArgument(
-                query, null, new ServletWebRequest(new MockHttpServletRequest()), null));
+        IllegalStateException.class, () -> resolver.resolveArgument(query, null, request, null));
   }
 
   record Query(
@@ -165,6 +181,13 @@ class JsonApiQueryParamsTest {
       JsonApiQuery requested) {}
 
   record Tags(@BindParam("filter[tag]") List<@NotBlank String> values) {}
+
+  record ExplicitQuery(@BindParam("filter[term]") String term, @BindParam("size") Integer size) {
+    ExplicitQuery(String term, @BindParam("page[size]") Integer size) {
+      this.term = term;
+      this.size = size;
+    }
+  }
 
   static final class Hex {
     private Integer number;

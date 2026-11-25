@@ -47,12 +47,11 @@ public final class JsonApiQueryParamsArgumentResolver implements HandlerMethodAr
       var errors = binder.getBindingResult().getAllErrors();
       if (!errors.isEmpty()) {
         throw new QueryBindingFailure(
+            ProtocolError.INVALID_QUERY_PARAMETER,
             errors.stream()
                 .map(error ->
-                    QueryBindingFailure.error(
-                        ProtocolError.INVALID_QUERY_PARAMETER,
-                        error instanceof FieldError field ? inputs.source(field.getField()) : null))
-                .toList());
+                    error instanceof FieldError field ? inputs.source(field.getField()) : null)
+                .toArray(String[]::new));
       }
     }
     return target;

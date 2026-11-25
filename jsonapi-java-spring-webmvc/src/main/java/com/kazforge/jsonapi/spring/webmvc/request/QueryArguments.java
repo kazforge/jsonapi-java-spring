@@ -35,8 +35,12 @@ final class QueryArguments {
     @Nullable Object[] args = new @Nullable Object[constructor.getParameterCount()];
     Map<String, Input> declared = new LinkedHashMap<>();
     boolean hasQuery = false;
+    var components = type.getRecordComponents();
     for (int i = 0; i < args.length; i++) {
-      var parameter = new MethodParameter(constructor, i);
+      var parameter =
+          components == null
+              ? new MethodParameter(constructor, i)
+              : MethodParameter.forFieldAwareConstructor(constructor, i, components[i].getName());
       if (parameter.getParameterType() == JsonApiQuery.class) {
         if (hasQuery || parameter.hasParameterAnnotation(BindParam.class)) {
           throw new IllegalStateException("Only one unannotated JsonApiQuery input is supported");
@@ -63,7 +67,7 @@ final class QueryArguments {
       }
     });
     if (!remaining.isEmpty()) {
-      throw failure(
+      throw new QueryBindingFailure(
           ProtocolError.UNSUPPORTED_QUERY_PARAMETER, remaining.keySet().iterator().next());
     }
     return BeanUtils.instantiateClass(constructor, args);
@@ -154,11 +158,7 @@ final class QueryArguments {
       } catch (ConversionFailedException ignored) {
         // Rejected values and converter messages are not public diagnostics.
       }
-      throw failure(ProtocolError.INVALID_QUERY_PARAMETER, name);
+      throw new QueryBindingFailure(ProtocolError.INVALID_QUERY_PARAMETER, name);
     }
-  }
-
-  private static QueryBindingFailure failure(ProtocolError reason, String name) {
-    return new QueryBindingFailure(List.of(QueryBindingFailure.error(reason, name)));
   }
 }
