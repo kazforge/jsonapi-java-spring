@@ -55,6 +55,12 @@ final class QueryArguments {
       }
     }
 
+    bindInputs(declared, args, conversion);
+    return BeanUtils.instantiateClass(constructor, args);
+  }
+
+  private void bindInputs(
+      Map<String, Input> declared, @Nullable Object[] args, ConversionService conversion) {
     Map<String, List<String>> remaining = new LinkedHashMap<>(query.filter());
     remaining.putAll(query.page());
     remaining.putAll(query.unprocessed());
@@ -70,7 +76,6 @@ final class QueryArguments {
       throw new QueryBindingFailure(
           ProtocolError.UNSUPPORTED_QUERY_PARAMETER, remaining.keySet().iterator().next());
     }
-    return BeanUtils.instantiateClass(constructor, args);
   }
 
   @Nullable String source(String field) {
