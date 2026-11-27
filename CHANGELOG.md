@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/kazforge/jsonapi-java-spring/compare/v0.6.0...v0.7.0) (2026-11-27)
+
+
+### Features
+
+* **boot:** auto-configure JSON:API for servlet MVC applications ([0754337](https://github.com/kazforge/jsonapi-java-spring/commit/0754337efd70926f607de976a44aef0f87b76894))
+
 ## [0.6.0](https://github.com/kazforge/jsonapi-java-spring/compare/v0.5.0...v0.6.0) (2026-11-25)
 
 
