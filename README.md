@@ -1,27 +1,35 @@
 # jsonapi-java-spring
 
-The separate Spring companion to [jsonapi-java](https://github.com/kazforge/jsonapi-java),
-with its own repository and release train.
+The Spring MVC companion to [jsonapi-java](https://github.com/kazforge/jsonapi-java) publishes
+two artifacts on Maven Central, both targeting Core **0.5.1**:
 
-The first module is `jsonapi-java-spring-webmvc`, a Jackson-neutral WebMVC adapter providing
-opt-in JSON:API media negotiation, operation-aware request/query context, safe protocol errors,
-and conventional resource DTO and relationship-linkage binding through public neutral contracts.
-Applications supply their `JsonApi` runtime; the adapter does not execute queries or select application/domain error
-semantics.
-The adapter targets Core 0.5.1. Configure `JsonApiResourceHttpMessageConverter` through Spring 7's
-`WebMvcConfigurer#configureMessageConverters(HttpMessageConverters.ServerBuilder)` to bind resource
-POST bodies and serialize DTOs; `JsonApiResponse<T>` adds optional top-level metadata, links, or a
-JSON:API object. Resource PATCH binds typed `PatchPresence<T>` DTO members, or an explicit
-`PatchCommand<T>`, without applying mutations. PATCH requires an application-supplied route identity
-callback on the converter; validation compares the request's type/id against that identity.
-The converter uses the request's opted-in resource context and leaves relationship and ordinary
-MVC handlers alone. Controllers and application exception handlers can also return
-`ResponseEntity<JsonApiErrorResponse>` by registering `JsonApiErrorHttpMessageConverter(runtime)`.
-Relationship handlers use the separate `JsonApiRelationshipHttpMessageConverter`; their explicit
-to-one/null and typed identifier-list contracts are recorded in
-[ADR 0009](docs/adr/0009-operation-aware-relationship-linkage-binding.md).
-Spring modules consume released jsonapi-java artifacts from
-Maven Central, not a sibling source checkout.
+- **`jsonapi-java-spring-boot-starter`** — Recommended for Spring Boot **4.1.x** (minimum **4.1.2**)
+  servlet MVC applications. Configures the adapter, Jackson 3 runtime, and PATCH validation.
+- **`jsonapi-java-spring-webmvc`** — Jackson-neutral HTTP adapter for standalone Spring Framework
+  **7.0.x** (minimum **7.0.9**) servlet MVC applications. Supply a `JsonApi` runtime and register
+  the adapter in your MVC configuration.
+
+Applications retain ownership of controllers, persistence, authorization, query execution, and
+representation policy. Unannotated Spring MVC endpoints keep their ordinary behavior.
+
+## Documentation
+
+The [release-owned Spring WebMVC guide](docs/site/index.md) covers compatibility, Spring Boot and
+standalone WebMVC setup, and endpoint usage. Released versions are published to the
+[JSON:API for Java documentation portal](https://jsonapi.kazforge.com/) from verified software
+release tags, not from `main`.
+
+See [repository architecture and decisions](docs/README.md) and
+[release readiness](docs/release.md).
+
+Two non-published consumer examples exercise real-runtime HTTP integration against published Core
+0.5.1:
+
+- [`examples/boot-webmvc`](examples/boot-webmvc) — Runnable Spring Boot application and embedded
+  HTTP integration tests using `jsonapi-java-spring-boot-starter`.
+- [`examples/jackson3-webmvc`](examples/jackson3-webmvc/README.md) — Explicit standalone
+  `WebMvcConfigurer` wiring and MockMvc integration tests using `jsonapi-java-spring-webmvc` and
+  `jsonapi-java-jackson3`.
 
 ## Development
 
@@ -33,17 +41,8 @@ Install JDK 21 and use the committed wrapper:
 ./gradlew spotlessCheck
 ```
 
-`build` includes formatting checks and validation of the reusable build conventions.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the module quality policy.
-
-The [release-owned Spring WebMVC guide](docs/site/index.md) covers consumer compatibility and setup. It is published to the shared portal from the verified software release tag, not from `main`.
-
-See [repository architecture and decisions](docs/README.md).
-
-The [Jackson 3 WebMVC consumer example](examples/jackson3-webmvc/README.md) demonstrates
-explicit application wiring and real-runtime HTTP integration against published Core 0.5.1.
-See [release readiness](docs/release.md) for the verified baseline and release boundary.
-
-See the [security policy](docs/security.md) for vulnerability triage and merge protection.
+`build` includes formatting checks and validation of the reusable build conventions. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the module quality policy and
+[docs/security.md](docs/security.md) for vulnerability triage and merge protection.
 
 Licensed under [Apache-2.0](LICENSE).

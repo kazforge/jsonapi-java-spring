@@ -25,7 +25,7 @@
       "extra-files": [
         {"type": "generic", "path": "gradle.properties"},
         {"type": "generic", "path": "docs/site/index.md"},
-        {"type": "generic", "path": "docs/site/webmvc.md"}
+        {"type": "generic", "path": "docs/site/getting-started.md"}
       ]
     }
   }
