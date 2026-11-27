@@ -9,6 +9,7 @@ import com.kazforge.jsonapi.example.boot.Articles.Article;
 import com.kazforge.jsonapi.patch.PatchCommand;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiPatchTarget;
+import com.kazforge.jsonapi.spring.webmvc.document.JsonApiNullableResponse;
 import com.kazforge.jsonapi.spring.webmvc.document.JsonApiToOneRelationship;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -35,7 +36,12 @@ import tools.jackson.databind.json.JsonMapper;
     classes = ArticleApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     useMainMethod = SpringBootTest.UseMainMethod.ALWAYS)
-@Import({BootHttpTest.Linkage.class, BootHttpTest.Commands.class, BootHttpTest.Ordinary.class})
+@Import({
+  BootHttpTest.Linkage.class,
+  BootHttpTest.Commands.class,
+  BootHttpTest.Ordinary.class,
+  BootHttpTest.ConcreteNullableGeneric.class
+})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class BootHttpTest {
   private static final String API = "application/vnd.api+json";
@@ -69,6 +75,78 @@ class BootHttpTest {
     assertTrue(get.headers().allValues("Vary").contains("Accept"));
     var empty = exchange("GET", "/articles?page%5Bsize%5D=0", "", API, API);
     assertEquals(mapper.readTree("[]"), body(empty).path("data"));
+  }
+
+  @Test
+  void writesPresentAndAbsentNullableResourceResponses() throws Exception {
+    var present = exchange("GET", "/articles/42/author", "", API, API);
+    assertEquals(200, present.statusCode(), present::body);
+    assertEquals(API, present.headers().firstValue("Content-Type").orElseThrow());
+    assertTrue(present.headers().allValues("Vary").contains("Accept"));
+    assertEquals("people", body(present).at("/data/type").asString());
+    assertEquals("7", body(present).at("/data/id").asString());
+    assertEquals("Ada", body(present).at("/data/attributes/name").asString());
+
+    var absent = exchange("GET", "/articles/missing/author", "", API, API);
+    assertEquals(200, absent.statusCode(), absent::body);
+    assertEquals(API, absent.headers().firstValue("Content-Type").orElseThrow());
+    assertTrue(absent.headers().allValues("Vary").contains("Accept"));
+    assertTrue(body(absent).has("data"));
+    assertTrue(body(absent).path("data").isNull());
+    assertFalse(body(absent).has("included"));
+    assertFalse(body(absent).has("meta"));
+    assertFalse(body(absent).has("links"));
+    assertFalse(body(absent).has("jsonapi"));
+
+    var optional = exchange("GET", "/articles/missing/optional", "", API, API);
+    assertTrue(body(optional).path("data").isNull());
+    var entity = exchange("GET", "/articles/missing/optional-entity", "", API, API);
+    assertEquals(202, entity.statusCode(), entity::body);
+    assertEquals("kept", entity.headers().firstValue("X-Nullable").orElseThrow());
+    assertTrue(body(entity).path("data").isNull());
+    var presentEntity = exchange("GET", "/articles/42/optional-entity", "", API, API);
+    assertEquals(202, presentEntity.statusCode(), presentEntity::body);
+    assertEquals("42", body(presentEntity).at("/data/id").asString());
+  }
+
+  @Test
+  void appliesIncludeAndFieldsetPolicyToNullableResources() throws Exception {
+    var denied = exchange("GET", "/articles/missing/optional?include=author", "", API, API);
+    assertEquals(400, denied.statusCode(), denied::body);
+    assertEquals("include", body(denied).at("/errors/0/source/parameter").asString());
+    var absentField =
+        exchange("GET", "/articles/missing/optional?fields%5Barticles%5D=title", "", API, API);
+    assertTrue(body(absentField).path("data").isNull());
+    var presentField =
+        exchange("GET", "/articles/42/optional?fields%5Barticles%5D=title", "", API, API);
+    assertEquals("News", body(presentField).at("/data/attributes/title").asString());
+  }
+
+  @Test
+  void writesNullableResourceEnvelopes() throws Exception {
+    var envelope = exchange("GET", "/articles/missing/optional-envelope", "", API, API);
+    assertTrue(body(envelope).path("data").isNull());
+    assertEquals("optional", body(envelope).at("/meta/source").asString());
+    assertEquals(
+        "/articles/missing/optional-envelope", body(envelope).at("/links/self").asString());
+    assertEquals("1.1", body(envelope).at("/jsonapi/version").asString());
+    var presentEnvelope = exchange("GET", "/articles/42/optional-envelope", "", API, API);
+    assertEquals("42", body(presentEnvelope).at("/data/id").asString());
+    assertEquals("optional", body(presentEnvelope).at("/meta/source").asString());
+    var encodedEnvelope = exchange("GET", "/articles/draft%231/optional-envelope", "", API, API);
+    assertEquals(
+        "/articles/draft%231/optional-envelope",
+        body(encodedEnvelope).at("/links/self").asString());
+  }
+
+  @Test
+  void writesGenericNullableResourcesWithResolvedTypes() throws Exception {
+    var generic = exchange("GET", "/nullable-generic", "", API, API);
+    assertEquals(200, generic.statusCode(), generic::body);
+    assertEquals("boxes", body(generic).at("/data/type").asString());
+    assertEquals("resolved", body(generic).at("/data/attributes/value").asString());
+    var genericAbsent = exchange("GET", "/nullable-generic-absent", "", API, API);
+    assertTrue(body(genericAbsent).path("data").isNull());
   }
 
   @Test
@@ -198,6 +276,25 @@ class BootHttpTest {
       return ResponseEntity.noContent().build();
     }
   }
+
+  abstract static class NullableGeneric<T> {
+    @GetMapping("/nullable-generic")
+    @SuppressWarnings("unchecked")
+    JsonApiNullableResponse<NullableBox<T>> present() {
+      JsonApiNullableResponse<NullableBox<String>> value =
+          JsonApiNullableResponse.of(new NullableBox<>("1", "resolved"));
+      return (JsonApiNullableResponse<NullableBox<T>>) (JsonApiNullableResponse<?>) value;
+    }
+
+    @GetMapping("/nullable-generic-absent")
+    JsonApiNullableResponse<NullableBox<T>> absent() {
+      return JsonApiNullableResponse.of(null);
+    }
+  }
+
+  @RestController
+  @JsonApiEndpoint
+  static class ConcreteNullableGeneric extends NullableGeneric<String> {}
 
   @RestController
   static class Ordinary {

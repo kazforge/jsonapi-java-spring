@@ -314,6 +314,149 @@ class JsonApiResourceBindingTest {
   }
 
   @Test
+  void writesPresentAndAbsentNullableResponsesThroughTheDeclaredType() throws Exception {
+    mvc.perform(get("/nullable-present").accept("application/vnd.api+json"))
+        .andExpect(status().isOk())
+        .andExpect(content().string("nullable-document"));
+    assertEquals("writeNullableOne", runtime.writes.getLast());
+    assertEquals(new Dto("present"), runtime.writtenValues.getLast());
+    assertEquals(Dto.class, runtime.nullableTypes.getLast());
+    assertNull(runtime.options.getLast().envelope().jsonapi());
+
+    mvc.perform(get("/nullable-absent").accept("application/vnd.api+json"))
+        .andExpect(status().isOk())
+        .andExpect(content().string("nullable-document"));
+    assertEquals("writeNullableOne", runtime.writes.getLast());
+    assertNull(runtime.writtenValues.getLast());
+    assertEquals(Dto.class, runtime.nullableTypes.getLast());
+  }
+
+  @Test
+  void nullableResponsesKeepEnvelopeAndRepresentationSelection() throws Exception {
+    mvc.perform(
+            get("/nullable-envelope")
+                .accept("application/vnd.api+json")
+                .queryParam("include", "author")
+                .queryParam("fields[articles]", "title"))
+        .andExpect(status().isOk());
+    ResourceWriteOptions options = runtime.options.getLast();
+    assertEquals(
+        "8", java.util.Objects.requireNonNull(options.envelope().meta()).members().get("page"));
+    assertTrue(
+        java.util.Objects.requireNonNull(options.envelope().links()).links().containsKey("self"));
+    assertEquals(JsonApiObject.ofVersion("1.1"), options.envelope().jsonapi());
+    assertTrue(options.selection().includeRequested());
+    assertEquals("author", options.selection().includePaths().getFirst().dotted());
+    assertEquals(List.of("title"), options.selection().fieldsets().get("articles"));
+  }
+
+  @Test
+  void nullableResponseEntitiesPreserveStatusAndHeaders() throws Exception {
+    mvc.perform(get("/nullable-entity").accept("application/vnd.api+json"))
+        .andExpect(status().isAccepted())
+        .andExpect(header().string("X-Nullable", "kept"))
+        .andExpect(content().contentType("application/vnd.api+json"));
+    assertEquals("writeNullableOne", runtime.writes.getLast());
+    assertNull(runtime.writtenValues.getLast());
+    assertEquals(Dto.class, runtime.nullableTypes.getLast());
+  }
+
+  @Test
+  void nullableResponsesPreserveResolvedGenericControllerTypes() throws Exception {
+    mvc.perform(get("/generic-nullable").accept("application/vnd.api+json"))
+        .andExpect(status().isOk());
+    ParameterizedType presentType =
+        assertInstanceOf(ParameterizedType.class, runtime.nullableTypes.getLast());
+    assertEquals(GenericDto.class, presentType.getRawType());
+    assertArrayEquals(new Type[] {String.class}, presentType.getActualTypeArguments());
+    assertEquals(new GenericDto<>("resolved-nullable"), runtime.writtenValues.getLast());
+
+    mvc.perform(get("/generic-nullable-absent").accept("application/vnd.api+json"))
+        .andExpect(status().isOk());
+    assertNull(runtime.writtenValues.getLast());
+    ParameterizedType absentType =
+        assertInstanceOf(ParameterizedType.class, runtime.nullableTypes.getLast());
+    assertEquals(GenericDto.class, absentType.getRawType());
+    assertArrayEquals(new Type[] {String.class}, absentType.getActualTypeArguments());
+
+    mvc.perform(get("/generic-nullable-entity").accept("application/vnd.api+json"))
+        .andExpect(status().isCreated());
+    assertEquals(new GenericDto<>("resolved-entity"), runtime.writtenValues.getLast());
+    ParameterizedType entityType =
+        assertInstanceOf(ParameterizedType.class, runtime.nullableTypes.getLast());
+    assertEquals(GenericDto.class, entityType.getRawType());
+    assertArrayEquals(new Type[] {String.class}, entityType.getActualTypeArguments());
+  }
+
+  @Test
+  void nullableResponsesUseTheDeclaredTypeRatherThanTheRuntimeSubtype() throws Exception {
+    mvc.perform(get("/nullable-subtype").accept("application/vnd.api+json"))
+        .andExpect(status().isOk());
+    assertEquals(BaseResource.class, runtime.nullableTypes.getLast());
+    assertInstanceOf(SpecializedResource.class, runtime.writtenValues.getLast());
+  }
+
+  @Test
+  void rejectsUnsupportedNullableDeclarationsWithoutRuntimeFallback() throws Exception {
+    int writes = runtime.writes.size();
+    for (String path :
+        List.of(
+            "/nullable-raw",
+            "/nullable-list",
+            "/nullable-array",
+            "/nullable-object",
+            "/nullable-wildcard",
+            "/nullable-nested-wildcard-array")) {
+      var response =
+          mvc.perform(get(path).accept("application/vnd.api+json"))
+              .andExpect(status().isInternalServerError())
+              .andReturn();
+      assertEquals("RESPONSE_SERIALIZATION_FAILED", errorCode(runtime.error));
+      assertFalse(response.getResponse().getContentAsString().contains("private"));
+    }
+    assertEquals(writes, runtime.writes.size());
+    assertTrue(runtime.nullableTypes.isEmpty());
+  }
+
+  @Test
+  void unsupportedNullableRuntimeFailsThroughTheSafeSerializationError() throws Exception {
+    runtime.unsupportedNullable = true;
+    var response =
+        mvc.perform(get("/nullable-present").accept("application/vnd.api+json"))
+            .andExpect(status().isInternalServerError())
+            .andReturn();
+    assertEquals("RESPONSE_SERIALIZATION_FAILED", errorCode(runtime.error));
+    assertFalse(response.getResponse().getContentAsString().contains("private"));
+  }
+
+  @Test
+  void nullableReadsUseTheExistingIncludePolicyAndDiagnosticsForAbsentResources() throws Exception {
+    runtime.writeDiagnostic = MappingDiagnostic.DENIED_RELATIONSHIP_INCLUDE;
+    mvc.perform(
+            get("/nullable-absent")
+                .accept("application/vnd.api+json")
+                .queryParam("include", "author"))
+        .andExpect(status().isBadRequest());
+    assertEquals(
+        "DISALLOWED_INCLUDE_PATH",
+        java.util.Objects.requireNonNull(runtime.error.errors()).getFirst().code());
+    mvc.perform(get("/nullable-absent").accept("application/vnd.api+json"))
+        .andExpect(status().isInternalServerError());
+    assertEquals("RESPONSE_SERIALIZATION_FAILED", errorCode(runtime.error));
+  }
+
+  @Test
+  void plainNullAndNoContentResponsesRemainBodyless() throws Exception {
+    mvc.perform(get("/bodyless").accept("application/vnd.api+json"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(""));
+    mvc.perform(get("/no-content").accept("application/vnd.api+json"))
+        .andExpect(status().isNoContent())
+        .andExpect(content().string(""));
+    assertTrue(runtime.writes.isEmpty());
+  }
+
+  @Test
   void rawStringAndByteResponsesBypassResourceSerialization() throws Exception {
     int resourceWrites = runtime.writes.size();
     mvc.perform(get("/plain-string").accept("application/vnd.api+json"))
@@ -601,6 +744,77 @@ class JsonApiResourceBindingTest {
       return List.of();
     }
 
+    @GetMapping("/nullable-present")
+    JsonApiNullableResponse<Dto> nullablePresent() {
+      return JsonApiNullableResponse.of(new Dto("present"));
+    }
+
+    @GetMapping("/nullable-absent")
+    JsonApiNullableResponse<Dto> nullableAbsent() {
+      return JsonApiNullableResponse.of(null);
+    }
+
+    @GetMapping("/nullable-envelope")
+    JsonApiNullableResponse<Dto> nullableEnvelope() {
+      return JsonApiNullableResponse.of(new Dto("envelope"))
+          .withMeta(Meta.of(Map.of("page", "8")))
+          .withLinks(Links.ofLinks(Map.of("self", Link.ObjectLink.ofHref("/articles?page=2"))))
+          .withJsonApi(JsonApiObject.ofVersion("1.1"));
+    }
+
+    @GetMapping("/nullable-entity")
+    ResponseEntity<JsonApiNullableResponse<Dto>> nullableEntity() {
+      return ResponseEntity.accepted()
+          .header("X-Nullable", "kept")
+          .body(JsonApiNullableResponse.of(null));
+    }
+
+    @GetMapping("/nullable-subtype")
+    JsonApiNullableResponse<BaseResource> nullableSubtype() {
+      return JsonApiNullableResponse.of(new SpecializedResource());
+    }
+
+    @GetMapping("/nullable-raw")
+    @SuppressWarnings("rawtypes")
+    JsonApiNullableResponse nullableRaw() {
+      return JsonApiNullableResponse.of(new Dto("raw"));
+    }
+
+    @GetMapping("/nullable-list")
+    JsonApiNullableResponse<List<Dto>> nullableList() {
+      return JsonApiNullableResponse.of(List.of(new Dto("list")));
+    }
+
+    @GetMapping("/nullable-array")
+    JsonApiNullableResponse<Dto[]> nullableArray() {
+      return JsonApiNullableResponse.of(new Dto[] {new Dto("array")});
+    }
+
+    @GetMapping("/nullable-object")
+    JsonApiNullableResponse<Object> nullableObject() {
+      return JsonApiNullableResponse.of(new Dto("object"));
+    }
+
+    @GetMapping("/nullable-wildcard")
+    JsonApiNullableResponse<? extends Dto> nullableWildcard() {
+      return JsonApiNullableResponse.of(new Dto("wildcard"));
+    }
+
+    @GetMapping("/nullable-nested-wildcard-array")
+    JsonApiNullableResponse<GenericDto<List<? extends Dto>[]>> nullableNestedWildcardArray() {
+      return JsonApiNullableResponse.of(null);
+    }
+
+    @GetMapping("/bodyless")
+    @Nullable Dto bodyless() {
+      return null;
+    }
+
+    @GetMapping("/no-content")
+    ResponseEntity<Void> noContent() {
+      return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/plain-string")
     String plainString() {
       return "plain";
@@ -678,6 +892,28 @@ class JsonApiResourceBindingTest {
     GenericDto<T> update(@RequestBody GenericDto<T> value) {
       return value;
     }
+
+    @GetMapping("/generic-nullable")
+    @SuppressWarnings("unchecked")
+    JsonApiNullableResponse<GenericDto<T>> nullable() {
+      JsonApiNullableResponse<GenericDto<String>> value =
+          JsonApiNullableResponse.of(new GenericDto<>("resolved-nullable"));
+      return (JsonApiNullableResponse<GenericDto<T>>) (JsonApiNullableResponse<?>) value;
+    }
+
+    @GetMapping("/generic-nullable-absent")
+    JsonApiNullableResponse<GenericDto<T>> nullableAbsent() {
+      return JsonApiNullableResponse.of(null);
+    }
+
+    @GetMapping("/generic-nullable-entity")
+    @SuppressWarnings("unchecked")
+    ResponseEntity<JsonApiNullableResponse<GenericDto<T>>> nullableEntity() {
+      JsonApiNullableResponse<GenericDto<String>> value =
+          JsonApiNullableResponse.of(new GenericDto<>("resolved-entity"));
+      return ResponseEntity.status(HttpStatus.CREATED)
+          .body((JsonApiNullableResponse<GenericDto<T>>) (JsonApiNullableResponse<?>) value);
+    }
   }
 
   @JsonApiEndpoint
@@ -695,6 +931,10 @@ class JsonApiResourceBindingTest {
   record Dto(String name) {}
 
   record GenericDto<T>(T value) {}
+
+  static class BaseResource {}
+
+  static final class SpecializedResource extends BaseResource {}
 
   static class DtoValidator implements Validator {
     @Override
@@ -773,13 +1013,15 @@ class JsonApiResourceBindingTest {
 
   static class Recording {
     final List<String> writes = new ArrayList<>();
-    final List<Object> writtenValues = new ArrayList<>();
+    final List<@Nullable Object> writtenValues = new ArrayList<>();
     final List<ResourceWriteOptions> options = new ArrayList<>();
+    final List<Type> nullableTypes = new ArrayList<>();
     final List<String> patchOperations = new ArrayList<>();
     int reads;
     boolean failRead;
     boolean failWrite;
     boolean unsupportedSources;
+    boolean unsupportedNullable;
     @Nullable MappingDiagnostic mappingDiagnostic;
     @Nullable MappingDiagnostic writeDiagnostic;
     JsonApiDocument error =
@@ -848,6 +1090,25 @@ class JsonApiResourceBindingTest {
                                           ? "resource-document"
                                           : "collection-document")
                                       .getBytes(StandardCharsets.UTF_8));
+                          yield null;
+                        }
+                        case "writeNullableOne" -> {
+                          if (unsupportedNullable) {
+                            throw new UnsupportedOperationException("private nullable details");
+                          }
+                          if (writeDiagnostic != null) {
+                            throw JsonApiMappingException.withoutLocation(
+                                writeDiagnostic, Dto.class, "private write details");
+                          }
+                          writes.add(method.getName());
+                          if (failWrite) {
+                            throw new IllegalStateException("secret");
+                          }
+                          writtenValues.add(args[0]);
+                          nullableTypes.add((Type) args[1]);
+                          options.add((ResourceWriteOptions) args[2]);
+                          ((ByteArrayOutputStream) args[3])
+                              .write("nullable-document".getBytes(StandardCharsets.UTF_8));
                           yield null;
                         }
                         default -> throw new UnsupportedOperationException(method.getName());

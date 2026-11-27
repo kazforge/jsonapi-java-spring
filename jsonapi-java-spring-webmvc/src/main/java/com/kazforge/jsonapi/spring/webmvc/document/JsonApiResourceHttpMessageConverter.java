@@ -26,10 +26,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -37,6 +39,7 @@ import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.GenericTypeResolver;
 import org.springframework.core.ResolvableType;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpOutputMessage;
@@ -63,6 +66,12 @@ import org.springframework.web.servlet.HandlerMapping;
  * <p>Create and typed PATCH require a runtime supporting Core's source-aware operations. The bound
  * DTO is returned directly to Spring; only the current dispatch retains its attribution for
  * request-body validation errors. A failed binding is not retried.
+ *
+ * <p>Responses write ordinary resources and typed collections through Core's strict single and
+ * collection operations. {@link JsonApiNullableResponse} selects Core's typed nullable
+ * single-resource operation for both present and absent values, using the complete declared
+ * resource type. A plain Java null or bodyless response remains Spring-owned and never selects the
+ * nullable operation.
  */
 public final class JsonApiResourceHttpMessageConverter
     implements GenericHttpMessageConverter<Object> {
@@ -246,6 +255,17 @@ public final class JsonApiResourceHttpMessageConverter
     return false;
   }
 
+  private static boolean hasWildcardDeep(Type type) {
+    return switch (type) {
+      case WildcardType ignored -> true;
+      case GenericArrayType array -> hasWildcardDeep(array.getGenericComponentType());
+      case ParameterizedType parameterized ->
+          Arrays.stream(parameterized.getActualTypeArguments())
+              .anyMatch(JsonApiResourceHttpMessageConverter::hasWildcardDeep);
+      default -> false;
+    };
+  }
+
   @Override
   public boolean canWrite(Class<?> clazz, @Nullable MediaType mediaType) {
     return canWrite(clazz, clazz, mediaType);
@@ -288,6 +308,10 @@ public final class JsonApiResourceHttpMessageConverter
     if (servletResponse != null && servletResponse.isCommitted()) {
       return;
     }
+    if (body instanceof JsonApiNullableResponse<?>(var value, var envelope)) {
+      writeNullable(value, envelope, type, context, outputMessage, servletResponse);
+      return;
+    }
     Object value = body;
     DocumentEnvelope envelope = DocumentEnvelope.empty();
     if (body instanceof JsonApiResponse<?>(var responseValue, var responseEnvelope)) {
@@ -304,16 +328,40 @@ public final class JsonApiResourceHttpMessageConverter
         runtime.resources().writeOne(value, options, serialized);
       }
     } catch (RuntimeException failure) {
-      if (isRejectedReadInclude(context, failure)) {
-        throw new JsonApiQueryException(
-            QueryDiagnostic.DISALLOWED_INCLUDE_PATH, "include", "Unsupported resource include");
-      }
-      LOGGER.log(
-          System.Logger.Level.WARNING, "JSON:API resource response serialization failed", failure);
-      throw new HttpMessageNotWritableException(
-          "Could not serialize JSON:API resource response", failure);
+      throw serializationFailure(context, failure);
     }
     JsonApiBodyWriter.write(serialized, outputMessage, servletResponse);
+  }
+
+  private void writeNullable(
+      @Nullable Object value,
+      DocumentEnvelope envelope,
+      @Nullable Type type,
+      JsonApiRequestContext context,
+      HttpOutputMessage outputMessage,
+      @Nullable HttpServletResponse servletResponse)
+      throws IOException {
+    ResourceWriteOptions options =
+        new ResourceWriteOptions(envelope, context.representationSelection());
+    ByteArrayOutputStream serialized = new ByteArrayOutputStream();
+    try {
+      runtime.resources().writeNullableOne(value, nullableResourceType(type), options, serialized);
+    } catch (RuntimeException failure) {
+      throw serializationFailure(context, failure);
+    }
+    JsonApiBodyWriter.write(serialized, outputMessage, servletResponse);
+  }
+
+  private static RuntimeException serializationFailure(
+      JsonApiRequestContext context, RuntimeException failure) {
+    if (isRejectedReadInclude(context, failure)) {
+      return new JsonApiQueryException(
+          QueryDiagnostic.DISALLOWED_INCLUDE_PATH, "include", "Unsupported resource include");
+    }
+    LOGGER.log(
+        System.Logger.Level.WARNING, "JSON:API resource response serialization failed", failure);
+    return new HttpMessageNotWritableException(
+        "Could not serialize JSON:API resource response", failure);
   }
 
   private static boolean isRejectedReadInclude(
@@ -323,6 +371,43 @@ public final class JsonApiResourceHttpMessageConverter
         && failure instanceof JsonApiMappingException mapping
         && (mapping.diagnostic() == MappingDiagnostic.DENIED_RELATIONSHIP_INCLUDE
             || mapping.diagnostic() == MappingDiagnostic.INVALID_INCLUDE_PATH);
+  }
+
+  private static Type nullableResourceType(@Nullable Type type) {
+    ResolvableType body = nullableResourceBody(type);
+    if (body == ResolvableType.NONE) {
+      throw unsupportedNullableType();
+    }
+    Type declared = Objects.requireNonNull(body.getType(), "declared resource type");
+    Class<?> raw = ResolvableType.forType(declared).resolve();
+    if (raw == null
+        || raw == Object.class
+        || hasUnresolvedType(declared)
+        || hasWildcardDeep(declared)
+        || Iterable.class.isAssignableFrom(raw)
+        || raw.isArray()
+        || raw == JsonApiResponse.class
+        || raw == JsonApiNullableResponse.class) {
+      throw unsupportedNullableType();
+    }
+    return declared;
+  }
+
+  private static HttpMessageNotWritableException unsupportedNullableType() {
+    return new HttpMessageNotWritableException(
+        "Unresolved or unsupported JSON:API nullable resource type");
+  }
+
+  private static ResolvableType nullableResourceBody(@Nullable Type type) {
+    if (type == null || type instanceof TypeVariable<?> || hasWildcardDeep(type)) {
+      return ResolvableType.NONE;
+    }
+    ResolvableType declared = ResolvableType.forType(type);
+    Class<?> raw = declared.resolve();
+    if (raw != null && HttpEntity.class.isAssignableFrom(raw)) {
+      return nullableResourceBody(declared.getGeneric(0).getType());
+    }
+    return raw == JsonApiNullableResponse.class ? declared.getGeneric(0) : ResolvableType.NONE;
   }
 
   private static boolean supportsBodyType(@Nullable Type type, @Nullable Class<?> valueClass) {
@@ -341,7 +426,11 @@ public final class JsonApiResourceHttpMessageConverter
           resolved instanceof ParameterizedType p ? p.getActualTypeArguments()[0] : Object.class;
       return supportsBodyType(valueType, null);
     }
-    return Iterable.class.isAssignableFrom(raw) || !raw.isPrimitive();
+    // Claim the nullable wrapper even when its declaration is unsupported so another converter
+    // cannot serialize the wrapper itself; the write path rejects it through the safe error path.
+    return raw == JsonApiNullableResponse.class
+        || Iterable.class.isAssignableFrom(raw)
+        || !raw.isPrimitive();
   }
 
   private static boolean supportsRequestTarget(

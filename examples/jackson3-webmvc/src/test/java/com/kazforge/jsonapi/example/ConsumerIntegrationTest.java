@@ -111,6 +111,86 @@ class ConsumerIntegrationTest {
   }
 
   @Test
+  void writesTypedNullableResourcesThroughTheRealRuntime() throws Exception {
+    JsonNode present =
+        body(
+            mvc.perform(get("/articles/42/optional").accept(JSON_API))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(JSON_API))
+                .andExpect(header().string("Vary", "Accept"))
+                .andReturn());
+    assertEquals("42", present.at("/data/id").asString());
+    assertEquals("Hello JSON:API", present.at("/data/attributes/title").asString());
+
+    JsonNode absent =
+        body(
+            mvc.perform(get("/articles/missing/optional").accept(JSON_API))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(JSON_API))
+                .andReturn());
+    assertTrue(absent.has("data"));
+    assertTrue(absent.path("data").isNull());
+    assertFalse(absent.has("included"));
+
+    JsonNode included =
+        body(
+            mvc.perform(get("/articles/missing/optional?include=editor").accept(JSON_API))
+                .andExpect(status().isOk())
+                .andReturn());
+    assertTrue(included.path("included").isArray());
+    assertEquals(0, included.path("included").size());
+
+    JsonNode emptyInclude =
+        body(
+            mvc.perform(get("/articles/missing/optional?include=").accept(JSON_API))
+                .andExpect(status().isOk())
+                .andReturn());
+    assertTrue(emptyInclude.path("included").isArray());
+    assertEquals(0, emptyInclude.path("included").size());
+
+    var invalid =
+        mvc.perform(get("/articles/missing/optional?include=unknown").accept(JSON_API))
+            .andExpect(status().isBadRequest())
+            .andReturn();
+    assertEquals("include", body(invalid).at("/errors/0/source/parameter").asString());
+
+    JsonNode absentField =
+        body(
+            mvc.perform(
+                    get("/articles/missing/optional")
+                        .queryParam("fields[articles]", "title")
+                        .accept(JSON_API))
+                .andExpect(status().isOk())
+                .andReturn());
+    assertTrue(absentField.path("data").isNull());
+    JsonNode presentField =
+        body(
+            mvc.perform(
+                    get("/articles/42/optional")
+                        .queryParam("fields[articles]", "title")
+                        .accept(JSON_API))
+                .andExpect(status().isOk())
+                .andReturn());
+    assertEquals("Hello JSON:API", presentField.at("/data/attributes/title").asString());
+    assertFalse(presentField.path("data").has("relationships"));
+
+    JsonNode entity =
+        body(
+            mvc.perform(get("/articles/missing/optional-entity").accept(JSON_API))
+                .andExpect(status().isAccepted())
+                .andExpect(header().string("X-Nullable", "kept"))
+                .andReturn());
+    assertTrue(entity.path("data").isNull());
+    JsonNode presentEntity =
+        body(
+            mvc.perform(get("/articles/42/optional-entity").accept(JSON_API))
+                .andExpect(status().isAccepted())
+                .andExpect(header().string("X-Nullable", "kept"))
+                .andReturn());
+    assertEquals("42", presentEntity.at("/data/id").asString());
+  }
+
+  @Test
   void realRuntimeErrorsAreTransportedAsJsonApiDocuments() throws Exception {
     assertError(
         mvc.perform(post("/articles").contentType(JSON_API).content("{private"))
