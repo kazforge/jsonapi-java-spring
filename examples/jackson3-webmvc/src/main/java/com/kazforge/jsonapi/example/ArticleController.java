@@ -3,6 +3,7 @@ package com.kazforge.jsonapi.example;
 import com.kazforge.jsonapi.core.model.ResourceIdentifier;
 import com.kazforge.jsonapi.patch.PatchPresence;
 import com.kazforge.jsonapi.spring.webmvc.JsonApiEndpoint;
+import com.kazforge.jsonapi.spring.webmvc.document.JsonApiNullableResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -51,5 +52,18 @@ public final class ArticleController {
   @GetMapping("/articles/empty")
   public List<Article> empty() {
     return List.of();
+  }
+
+  @GetMapping("/articles/{id}/optional")
+  public JsonApiNullableResponse<Article> optional(@PathVariable("id") String id) {
+    return JsonApiNullableResponse.of("42".equals(id) ? one(id) : null);
+  }
+
+  @GetMapping("/articles/{id}/optional-entity")
+  public ResponseEntity<JsonApiNullableResponse<Article>> optionalEntity(
+      @PathVariable("id") String id) {
+    return ResponseEntity.accepted()
+        .header("X-Nullable", "kept")
+        .body(JsonApiNullableResponse.of("42".equals(id) ? one(id) : null));
   }
 }

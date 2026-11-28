@@ -35,6 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Configuration(proxyBeanMethods = false)
 @EnableWebMvc
 public class ConsumerConfiguration implements WebMvcConfigurer {
+  private static final String ARTICLES = "articles";
   private final JsonApi runtime;
 
   public ConsumerConfiguration(JsonApi runtime) {
@@ -43,7 +44,11 @@ public class ConsumerConfiguration implements WebMvcConfigurer {
 
   @Bean
   public static JsonApi jsonApi() {
-    var includes = IncludePolicy.allowing(Set.of(RelationshipAllowance.of("articles", "author")));
+    var includes =
+        IncludePolicy.allowing(
+            Set.of(
+                RelationshipAllowance.of(ARTICLES, "author"),
+                RelationshipAllowance.of(ARTICLES, "editor")));
     return JsonApiJackson3.builder(JsonMapper.builder().build())
         .representationPolicy(RepresentationPolicy.defaults().withIncludePolicy(includes))
         .build();
@@ -76,7 +81,7 @@ public class ConsumerConfiguration implements WebMvcConfigurer {
                   request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
               if (attribute instanceof Map<?, ?> variables
                   && variables.get("id") instanceof String id) {
-                return new EndpointIdentity("articles", id);
+                return new EndpointIdentity(ARTICLES, id);
               }
               return null;
             }));

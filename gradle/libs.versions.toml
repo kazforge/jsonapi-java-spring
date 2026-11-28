@@ -9,7 +9,7 @@ junit = "6.1.3"
 jacoco = "0.8.15"
 sonarqube = "7.6.0.18749"
 cyclonedx = "3.6.1"
-jsonapi = "0.5.1"
+jsonapi = "0.6.0"
 # Consumer compatibility floor; changes require a maintainer decision.
 spring-minimum = "7.0.9"
 # Test-only forward compatibility target.

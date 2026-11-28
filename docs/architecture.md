@@ -32,11 +32,11 @@ Dependencies resolve from Maven Central; the Plugin Portal also supplies build t
 Spring integration's core dependency boundary is released public neutral APIs, not
 core source or internal packages.
 
-The WebMVC module exposes `jsonapi-java-api:0.5.1`, `jsonapi-java-query:0.5.1`, Spring WebMVC,
-the Servlet 6.1 API, and the Jakarta Validation 3.1 API. Core 0.5.1 is the supported Core baseline.
+The WebMVC module exposes `jsonapi-java-api:0.6.0`, `jsonapi-java-query:0.6.0`, Spring WebMVC,
+the Servlet 6.1 API, and the Jakarta Validation 3.1 API. Core 0.6.0 is the supported Core baseline.
 The adapter's production and test dependencies contain no Jackson runtime. A Jakarta Validation
 provider is used in tests and in the separate non-published consumer example, never in the adapter
-runtime. The example uses `jsonapi-java-jackson3:0.5.1` from Maven Central and supplies the neutral
+runtime. The example uses `jsonapi-java-jackson3:0.6.0` from Maven Central and supplies the neutral
 `JsonApi` runtime and the validator. No source substitution or local Core build is used.
 
 ## Request boundary
@@ -68,10 +68,14 @@ For a `RESOURCE` endpoint, POST request bodies bind once through the supplied ru
 `resources().readCreateWithSources`. DTO responses use `writeOne`; typed collections use `writeMany`,
 with the current request's representation selection passed per operation. `JsonApiResponse<T>` adds
 optional top-level meta, links, or an explicit JSON:API object without replacing the application
-value. Unwrapped responses remain ordinary resource documents. Relationship endpoints and ordinary
-unmarked handlers are not claimed. Applications retain ownership of persistence, query execution,
-authorization, route identity, and domain validation policy. Resource and collection values are
-non-null; plain null or bodyless returns remain Spring bodyless responses.
+value. `JsonApiNullableResponse<T>` distinguishes an explicitly optional single resource from a
+bodyless response: Core writes a typed present value or explicit `data: null` with the declared
+resource type, so ordinary envelope, include, fieldset, and representation-policy behavior applies
+to both. It does not accept collections. Unwrapped responses remain ordinary resource documents.
+Relationship endpoints and ordinary unmarked handlers are not claimed. Applications retain
+ownership of persistence, query execution, authorization, route identity, and domain validation
+policy. Non-null resource and collection values remain strict; plain null or bodyless returns remain
+Spring bodyless responses.
 
 For resource PATCH, the same converter binds `@RequestBody` typed PATCH DTOs through
 `JsonApi.patches().bindPatchWithSources`, or an explicit `PatchCommand<T>` through `bindCommand`. One
